@@ -312,8 +312,8 @@ public class TestChamber {
                                                         if(ComplexFeedback)
                                                             nar.addInput("(--,<"+goal+" --> [on]>). :|: %1.00;0.90%");
                                                     }
-                                                    if(obi!=null) {
-                                                        inventorybag=(LocalGridObject)obi;
+                                                    if(inventorybag!=null) {
+
                                                         System.out.println(inventorybag.doorname);
                                                         if(cells.readCells[i][j].logic==Logic.WIRE && inventorybag.doorname.contains("wirecut") )
                                                         {
