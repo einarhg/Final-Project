@@ -312,6 +312,21 @@ public class TestChamber {
                                                         if(ComplexFeedback)
                                                             nar.addInput("(--,<"+goal+" --> [on]>). :|: %1.00;0.90%");
                                                     }
+                                                    if(obi!=null) {
+                                                        inventorybag=(LocalGridObject)obi;
+                                                        System.out.println(inventorybag.doorname);
+                                                        if(cells.readCells[i][j].logic==Logic.WIRE && inventorybag.doorname.contains("wirecut") )
+                                                        {
+                                                            cells.readCells[i][j].logic = Logic.OFFSWITCH;
+                                                            cells.writeCells[i][j].logic = Logic.OFFSWITCH;
+                                                            cells.readCells[i][j].charge = 0.0f;
+                                                            cells.writeCells[i][j].charge = 0.0f;
+
+                                                            if (ComplexFeedback)
+                                                                nar.addInput("(--,<" + goal + " --> [on]>). :|: %1.00;0.90%");
+                                                        }
+                                                    }
+                                                    else{System.out.println("Isnull");}
                                                 }
                                             }
                                         }
