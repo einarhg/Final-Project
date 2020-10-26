@@ -14,42 +14,49 @@
  */
 package org.opennars.lab.grid2d.object;
 
+import java.awt.Color;
+import org.opennars.lab.grid2d.main.Effect;
+import org.opennars.lab.grid2d.main.LocalGridObject;
+
 /**
  *
  * @author me
  */
+public class Wirecutters extends LocalGridObject {
 
-
-public class Wirecutters {
-
+    public Wirecutters(int x, int y, String doorname) {
+        super(x, y);
+        this.doorname = doorname;
+    }
 
     @Override
     public void update(Effect nextEffect) {
     }
 
+
     @Override
     public void draw() {
-        float scale = (float) Math.sin(space.getTime() / 7f) * 0.05f + 1.0f;
-        float a = space.getTime() / 10;
+        float scale = (float)Math.sin(space.getTime()/7f)*0.05f + 1.0f;
+        float a = space.getTime()/10;
 
         space.pushMatrix();
         space.translate(cx, cy);
 
         space.pushMatrix();
         space.rotate(a);
-        space.scale(scale * 0.8f);
+        space.scale(scale*0.8f);
 
         space.fill(Color.BLUE.getRGB());
-        space.rect(-0.4f, -0.15f / 2, 0.8f, 0.15f);
+        space.rect(-0.4f, 0.1f, 0.8f, 0.05f);
+        space.rect(-0.4f, -0.1f, 0.8f, 0.05f);
         space.rect(-0.5f, -0.2f, 0.3f, 0.4f);
-        space.rect(0.3f, 0, 0.1f, 0.15f);
-        space.rect(0.1f, 0, 0.1f, 0.15f);
         space.popMatrix();
-        if (!"".equals(doorname)) {
+        if(!"".equals(doorname))
+        {
             space.textSize(0.2f);
-            space.fill(255, 0, 0);
+            space.fill(255,0,0);
             space.pushMatrix();
-            space.text(doorname, 0, 0);
+            space.text(doorname,0,0);
             space.popMatrix();
         }
 

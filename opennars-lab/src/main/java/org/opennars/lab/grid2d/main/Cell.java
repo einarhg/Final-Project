@@ -42,7 +42,11 @@ public class Cell {
         Empty, DirtWall,
         Machine,
         Water,
-        Pizza
+        Pizza,
+        ////////////////////////////////////////
+        ////////////////////////////////////////
+        Wirecutters
+        ////////////////////////////////////////
         //case Tile.Upstairs:
         //case Tile.Downstairs:
         //case Tile.Chest:        

@@ -47,6 +47,7 @@ import org.opennars.lab.grid2d.main.LocalGridObject;
 import org.opennars.lab.grid2d.main.TestChamber;
 import org.opennars.lab.grid2d.object.Key;
 import org.opennars.lab.grid2d.object.Pizza;
+import org.opennars.lab.grid2d.object.Wirecutters;
 import org.opennars.io.Symbols;
 import processing.core.PVector;
 
@@ -239,6 +240,18 @@ public class EditorPanel extends JPanel {
                 addu.space=s;
                 newobj.add(addu);
             }
+
+            ////////////////////////////////////////////////////
+            ////////////////////////////////////////////////////
+            if(val[0].equals("Wirecutters")) {
+                Wirecutters addu=new Wirecutters(x,y,name);
+                if(TestChamber.staticInformation)
+                    s.nar.addInput("<"+name+" --> wirecutters>.");
+                addu.space=s;
+                newobj.add(addu);
+            }
+            ////////////////////////////////////////////////////
+
         }
         s.objects=newobj;
     }
@@ -578,6 +591,16 @@ public class EditorPanel extends JPanel {
             }
         });
 
+        //////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////
+        machineMenu.add(new EditorMode("Wirecutters") {
+            @Override
+            public void run() {
+                s.cells.click("Wirecutters", "", "");
+            }
+        });
+        //////////////////////////////////////////////////////////////
+
         actionMenu.add(new EditorMode("Go-To named") {
 
             @Override
@@ -787,6 +810,7 @@ public class EditorPanel extends JPanel {
                 s.cells.click("Pizza", "", "");
             }
         });
+
     }
     
     public void loadLevels(File f, DefaultMutableTreeNode load, final Grid2DSpace s) {
