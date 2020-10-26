@@ -1,0 +1,622 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Concept.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.entity</a> &gt; <span class="el_source">Concept.java</span></div><h1>Concept.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.entity;
+
+import org.opennars.control.DerivationContext;
+import org.opennars.inference.LocalRules;
+import org.opennars.interfaces.Timable;
+import org.opennars.io.Symbols.NativeOperator;
+import org.opennars.io.events.Events.*;
+import org.opennars.language.CompoundTerm;
+import org.opennars.language.Term;
+import org.opennars.main.Shell;
+import org.opennars.main.Parameters;
+import org.opennars.storage.Bag;
+import org.opennars.storage.Memory;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import org.opennars.control.concept.ProcessQuestion;
+
+import static org.opennars.inference.BudgetFunctions.distributeAmongLinks;
+import static org.opennars.inference.BudgetFunctions.rankBelief;
+import static org.opennars.inference.UtilityFunctions.or;
+
+/**
+ * Concept as defined by the NARS-theory
+ *
+ * Concepts are used to keep track of interrelated sentences
+ *
+ * @author Pei Wang
+ * @author Patrick Hammer
+ */
+public class Concept extends Item&lt;Term&gt; implements Serializable {
+
+    
+    /**
+     * The term is the unique ID of the concept
+     */
+    public final Term term;
+    
+    //recent events that happened before the operation the
+    //concept represents was executed
+    public Bag&lt;Task&lt;Term&gt;,Sentence&lt;Term&gt;&gt; seq_before;
+
+    /**
+     * Task links for indirect processing
+     */
+    public final Bag&lt;TaskLink,Task&gt; taskLinks;
+
+    /**
+     * Term links between the term and its components and compounds; beliefs
+     */
+    public final Bag&lt;TermLink,TermLink&gt; termLinks;
+
+    /**
+     * Link templates of TermLink, only in concepts with CompoundTerm Templates
+     * are used to improve the efficiency of TermLink building
+     */
+    public final List&lt;TermLink&gt; termLinkTemplates;
+
+    /**
+     * Pending Question directly asked about the term
+     *
+     * Note: since this is iterated frequently, an array should be used. To
+     * avoid iterator allocation, use .get(n) in a for-loop
+     */
+    public final List&lt;Task&gt; questions;
+
+    
+    /**
+     * Pending Quests to be answered by new desire values
+     */
+    public final List&lt;Task&gt; quests;
+
+    /**
+     * Judgments directly made about the term Use List because of access
+     * and insertion in the middle
+     */
+    public final List&lt;Task&gt; beliefs;
+    public List&lt;Task&gt; executable_preconditions;
+    public List&lt;Task&gt; general_executable_preconditions;
+
+    /**
+     * Desire values on the term, similar to the above one
+     */
+    public final List&lt;Task&gt; desires;
+
+    /**
+     * Reference to the memory to which the Concept belongs
+     */
+    public final Memory memory;
+    
+
+    //use to create averaging stats of occurring intervals
+    //so that revision can decide whether to use the new or old term
+    //based on which intervals are closer to the average
+<span class="fc" id="L120">    public final List&lt;Float&gt; recent_intervals = new ArrayList&lt;&gt;();</span>
+    
+<span class="fc" id="L122">    public boolean observable = false; //whether it received a &quot;native&quot; input task</span>
+<span class="fc" id="L123">    public boolean allowBabbling = true; //for operations, becomes false if sufficiently</span>
+                                         //confident, used procedure knowledge  exists.
+
+    /**
+     * Constructor, called in Memory.getConcept only
+     *
+     * @param tm A term corresponding to the concept
+     * @param memory A reference to the memory
+     */
+    public Concept(final BudgetValue b, final Term tm, final Memory memory) {
+<span class="fc" id="L133">        super(b);        </span>
+        
+<span class="fc" id="L135">        this.term = tm;</span>
+<span class="fc" id="L136">        this.memory = memory;</span>
+
+<span class="fc" id="L138">        this.questions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L139">        this.beliefs = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L140">        this.executable_preconditions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L141">        this.general_executable_preconditions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L142">        this.quests = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L143">        this.desires = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L145">        this.taskLinks = new Bag&lt;&gt;(memory.narParameters.TASK_LINK_BAG_LEVELS, memory.narParameters.TASK_LINK_BAG_SIZE, memory.narParameters);</span>
+<span class="fc" id="L146">        this.termLinks = new Bag&lt;&gt;(memory.narParameters.TERM_LINK_BAG_LEVELS, memory.narParameters.TERM_LINK_BAG_SIZE, memory.narParameters);</span>
+                
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (tm instanceof CompoundTerm) {</span>
+<span class="fc" id="L149">            this.termLinkTemplates = ((CompoundTerm) tm).prepareComponentLinks();</span>
+        } else {
+<span class="fc" id="L151">            this.termLinkTemplates = null;</span>
+        }
+
+<span class="fc" id="L154">    }</span>
+
+    @Override public boolean equals(final Object obj) {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (this == obj) return true;</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (!(obj instanceof Concept)) return false;</span>
+<span class="fc" id="L159">        return ((Concept)obj).name().equals(name());</span>
+    }
+
+<span class="fc" id="L162">    @Override public int hashCode() { return name().hashCode();     }</span>
+
+    
+    @Override
+    public Term name() {
+<span class="fc" id="L167">        return term;</span>
+    }
+
+
+
+    public void addToTable(final Task task, final boolean rankTruthExpectation, final List&lt;Task&gt; table, final int max, final Class eventAdd, final Class eventRemove, final Object... extraEventArguments) {
+        
+<span class="fc" id="L174">        final int preSize = table.size();</span>
+        final Task removedT;
+<span class="fc" id="L176">        Sentence removed = null;</span>
+<span class="fc" id="L177">        removedT = addToTable(task, table, max, rankTruthExpectation);</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if(removedT != null) {</span>
+<span class="fc" id="L179">            removed=removedT.sentence;</span>
+        }
+
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (removed != null) {</span>
+<span class="fc" id="L183">            memory.event.emit(eventRemove, this, removed, task, extraEventArguments);</span>
+        }
+<span class="fc bfc" id="L185" title="All 4 branches covered.">        if ((preSize != table.size()) || (removed != null)) {</span>
+<span class="fc" id="L186">            memory.event.emit(eventAdd, this, task, extraEventArguments);</span>
+        }
+<span class="fc" id="L188">    }</span>
+    
+    /**
+     * Link to a new task from all relevant concepts for continued processing in
+     * the near future for unspecified time.
+     * &lt;p&gt;
+     * The only method that calls the TaskLink constructor.
+     *
+     * @param task The task to be linked
+     * @param content The content of the task
+     */
+    public TaskLink linkToTask(final Task task, final DerivationContext content) {
+<span class="fc" id="L200">        final BudgetValue taskBudget = task.budget;</span>
+
+<span class="fc" id="L202">        TaskLink retLink = new TaskLink(task, null, taskBudget, content.narParameters.TERM_LINK_RECORD_LENGTH);</span>
+<span class="fc" id="L203">        insertTaskLink(retLink, content);  // link type: SELF</span>
+
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (!(term instanceof CompoundTerm)) {</span>
+<span class="fc" id="L206">            return retLink;</span>
+        }
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (termLinkTemplates.isEmpty()) {</span>
+<span class="fc" id="L209">            return retLink;</span>
+        }
+                
+<span class="fc" id="L212">        final BudgetValue subBudget = distributeAmongLinks(taskBudget, termLinkTemplates.size(), content.narParameters);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (subBudget.aboveThreshold()) {</span>
+
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            for (final TermLink termLink : termLinkTemplates) {</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                if (termLink.type == TermLink.TEMPORAL)</span>
+<span class="nc" id="L217">                    continue;</span>
+<span class="fc" id="L218">                final Term componentTerm = termLink.target;</span>
+
+<span class="fc" id="L220">                final Concept componentConcept = memory.conceptualize(subBudget, componentTerm);</span>
+
+<span class="fc bfc" id="L222" title="All 2 branches covered.">                if (componentConcept != null) {</span>
+<span class="fc" id="L223">                    synchronized(componentConcept) {</span>
+<span class="fc" id="L224">                        componentConcept.insertTaskLink(new TaskLink(task, termLink, subBudget, content.narParameters.TERM_LINK_RECORD_LENGTH), content</span>
+                        );
+<span class="fc" id="L226">                    }</span>
+                }
+<span class="fc" id="L228">            }</span>
+
+<span class="fc" id="L230">            buildTermLinks(taskBudget, content.narParameters);  // recursively insert TermLink</span>
+        }
+<span class="fc" id="L232">        return retLink;</span>
+    }
+
+    /**
+     * Add a new belief (or goal) into the table Sort the beliefs/desires by
+     * rank, and remove redundant or low rank one
+     *
+     * @param table The table to be revised
+     * @param capacity The capacity of the table
+     * @return whether table was modified
+     */
+    public static Task addToTable(final Task newTask, final List&lt;Task&gt; table, final int capacity, final boolean rankTruthExpectation) {
+<span class="fc" id="L244">        final Sentence newSentence = newTask.sentence;</span>
+<span class="fc" id="L245">        final float rank1 = rankBelief(newSentence, rankTruthExpectation);    // for the new isBelief</span>
+        float rank2;        
+        int i;
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        for (i = 0; i &lt; table.size(); i++) {</span>
+<span class="fc" id="L249">            final Sentence judgment2 = table.get(i).sentence;</span>
+<span class="fc" id="L250">            rank2 = rankBelief(judgment2, rankTruthExpectation);</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">            if (rank1 &gt;= rank2) {</span>
+<span class="fc bfc" id="L252" title="All 4 branches covered.">                if (newSentence.truth.equals(judgment2.truth) &amp;&amp; newSentence.stamp.equals(judgment2.stamp,false,true,true)) {</span>
+                    //System.out.println(&quot; ---------- Equivalent Belief: &quot; + newSentence + &quot; == &quot; + judgment2);
+<span class="fc" id="L254">                    return null;</span>
+                }
+<span class="fc" id="L256">                table.add(i, newTask);</span>
+<span class="fc" id="L257">                break;</span>
+            }            
+        }
+        
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        if (table.size() == capacity) {</span>
+            // nothing
+        }
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        else if (table.size() &gt; capacity) {</span>
+<span class="fc" id="L265">            final Task removed = table.remove(table.size() - 1);</span>
+<span class="fc" id="L266">            return removed;</span>
+        }
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        else if (i == table.size()) { // branch implies implicit table.size() &lt; capacity</span>
+<span class="fc" id="L269">            table.add(newTask);</span>
+        }
+        
+<span class="fc" id="L272">        return null;</span>
+    }
+
+    /**
+     * Select a belief value or desire value for a given query
+     *
+     * @param query The query to be processed
+     * @param list The list of beliefs or desires to be used
+     * @return The best candidate selected
+     */
+    public Task selectCandidate(final Task query, final List&lt;Task&gt; list, final Timable time) {
+ //        if (list == null) {
+        //            return null;
+        //        }
+<span class="fc" id="L286">        float currentBest = 0;</span>
+        float beliefQuality;
+<span class="fc" id="L288">        Task candidate = null;</span>
+<span class="fc" id="L289">        final boolean rateByConfidence = true; //table vote, yes/no question / local processing</span>
+<span class="fc" id="L290">        synchronized (list) {</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">            for (final Task judgT : list) {</span>
+<span class="fc" id="L292">                final Sentence judg = judgT.sentence;</span>
+<span class="fc" id="L293">                beliefQuality = LocalRules.solutionQuality(rateByConfidence, query, judg, memory, time); //makes revision explicitly search for</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">                if (beliefQuality &gt; currentBest /*&amp;&amp; (!forRevision || judgT.sentence.equalsContent(query)) */ /*&amp;&amp; (!forRevision || !Stamp.baseOverlap(query.stamp.evidentialBase, judg.stamp.evidentialBase)) */) {</span>
+<span class="fc" id="L295">                    currentBest = beliefQuality;</span>
+<span class="fc" id="L296">                    candidate = judgT;</span>
+                }
+<span class="fc" id="L298">            }</span>
+<span class="fc" id="L299">        }</span>
+<span class="fc" id="L300">        return candidate;</span>
+    }
+    
+    public static class AnticipationEntry implements Serializable {
+<span class="fc" id="L304">        public float negConfirmationPriority = 0.0f;</span>
+<span class="fc" id="L305">        public Task negConfirmation = null;</span>
+<span class="fc" id="L306">        public long negConfirm_abort_mintime = 0;</span>
+<span class="fc" id="L307">        public long negConfirm_abort_maxtime = 0;</span>
+<span class="fc" id="L308">        public AnticipationEntry(float negConfirmationPriority, Task negConfirmation, long negConfirm_abort_mintime, long negConfirm_abort_maxtime) {</span>
+<span class="fc" id="L309">            this.negConfirmationPriority = negConfirmationPriority;</span>
+<span class="fc" id="L310">            this.negConfirmation = negConfirmation;</span>
+<span class="fc" id="L311">            this.negConfirm_abort_mintime = negConfirm_abort_mintime;</span>
+<span class="fc" id="L312">            this.negConfirm_abort_maxtime = negConfirm_abort_maxtime;</span>
+<span class="fc" id="L313">        }</span>
+    }
+<span class="fc" id="L315">    public List&lt;AnticipationEntry&gt; anticipations = new ArrayList&lt;&gt;();</span>
+    
+    
+    /* ---------- insert Links for indirect processing ---------- */
+    /**
+     * Insert a TaskLink into the TaskLink bag
+     * &lt;p&gt;
+     * called only from Memory.continuedProcess
+     *
+     * @param taskLink The termLink to be inserted
+     */
+    protected boolean insertTaskLink(final TaskLink taskLink, final DerivationContext nal) {
+<span class="fc" id="L327">        final Task target = taskLink.getTarget();</span>
+        //what question answering, question side:
+<span class="fc" id="L329">        ProcessQuestion.ProcessWhatQuestion(this, target, nal);</span>
+        //what question answering, belief side:
+<span class="fc" id="L331">        ProcessQuestion.ProcessWhatQuestionAnswer(this, target, nal);</span>
+        //HANDLE MAX PER CONTENT
+        //if taskLinks already contain a certain amount of tasks with same content then one has to go
+<span class="fc" id="L334">        final boolean isEternal = target.sentence.isEternal();</span>
+<span class="fc" id="L335">        int nSameContent = 0;</span>
+<span class="fc" id="L336">        float lowest_priority = Float.MAX_VALUE;</span>
+<span class="fc" id="L337">        TaskLink lowest = null;</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">        for(final TaskLink tl : taskLinks) {</span>
+<span class="fc" id="L339">            final Sentence s = tl.getTarget().sentence;</span>
+<span class="fc bfc" id="L340" title="All 4 branches covered.">            if(s.getTerm().equals(taskLink.getTerm()) &amp;&amp; s.isEternal() == isEternal) {</span>
+<span class="fc" id="L341">                nSameContent++; //same content and occurrence-type, so count +1</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">                if(tl.getPriority() &lt; lowest_priority) { //the current one has lower priority so save as lowest</span>
+<span class="fc" id="L343">                    lowest_priority = tl.getPriority();</span>
+<span class="fc" id="L344">                    lowest = tl;</span>
+                }
+<span class="fc bfc" id="L346" title="All 2 branches covered.">                if(nSameContent &gt; nal.narParameters.TASKLINK_PER_CONTENT) { //ok we reached the maximum so lets delete the lowest</span>
+<span class="fc" id="L347">                    taskLinks.pickOut(lowest);</span>
+<span class="fc" id="L348">                    memory.emit(TaskLinkRemove.class, lowest, this);</span>
+<span class="fc" id="L349">                    break;</span>
+                }
+            }
+<span class="fc" id="L352">        }</span>
+        //END HANDLE MAX PER CONTENT
+<span class="fc" id="L354">        final TaskLink removed = taskLinks.putIn(taskLink);      </span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        if (removed!=null) {</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">            if (removed == taskLink) {</span>
+<span class="fc" id="L357">                memory.emit(TaskLinkRemove.class, taskLink, this);</span>
+<span class="fc" id="L358">                return false;</span>
+            }
+            else {
+<span class="fc" id="L361">                memory.emit(TaskLinkRemove.class, removed, this);</span>
+            }
+        }
+<span class="fc" id="L364">        memory.emit(TaskLinkAdd.class, taskLink, this);</span>
+<span class="fc" id="L365">        return true;</span>
+    }
+
+
+    /**
+     * Recursively build TermLinks between a compound and its components
+     * &lt;p&gt;
+     * called only from Memory.continuedProcess
+     *
+     * @param taskBudget The BudgetValue of the task
+     */
+    public void buildTermLinks(final BudgetValue taskBudget, Parameters narParameters) {
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        if (termLinkTemplates.size() == 0) {</span>
+<span class="fc" id="L378">            return;</span>
+        }
+        
+<span class="fc" id="L381">        final BudgetValue subBudget = distributeAmongLinks(taskBudget, termLinkTemplates.size(), narParameters);</span>
+
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        if (!subBudget.aboveThreshold()) {</span>
+<span class="fc" id="L384">            return;</span>
+        }
+
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        for (final TermLink template : termLinkTemplates) {</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">            if (template.type == TermLink.TRANSFORM) {</span>
+<span class="fc" id="L389">                continue;</span>
+            }
+
+<span class="fc" id="L392">            final Term target = template.target;</span>
+
+<span class="fc" id="L394">            final Concept concept = memory.conceptualize(taskBudget, target);</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">            if (concept == null) {</span>
+<span class="fc" id="L396">                continue;</span>
+            }
+
+            // this termLink to that and vice versa
+<span class="fc" id="L400">            insertTermLink(new TermLink(target, template, subBudget));</span>
+<span class="fc" id="L401">            concept.insertTermLink(new TermLink(term, template, subBudget));</span>
+
+<span class="pc bpc" id="L403" title="1 of 4 branches missed.">            if (target instanceof CompoundTerm &amp;&amp; template.type != TermLink.TEMPORAL) {</span>
+<span class="fc" id="L404">                concept.buildTermLinks(subBudget, narParameters);</span>
+            }
+<span class="fc" id="L406">        }</span>
+<span class="fc" id="L407">    }</span>
+
+    /**
+     * Insert a TermLink into the TermLink bag
+     * &lt;p&gt;
+     * called from buildTermLinks only
+     *
+     * @param termLink The termLink to be inserted
+     */
+    public boolean insertTermLink(final TermLink termLink) {
+<span class="fc" id="L417">        final TermLink removed = termLinks.putIn(termLink);</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        if (removed!=null) {</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">            if (removed == termLink) {</span>
+<span class="fc" id="L420">                memory.emit(TermLinkRemove.class, termLink, this);</span>
+<span class="fc" id="L421">                return false;</span>
+            }
+            else {
+                //emit remove and add for this case
+<span class="fc" id="L425">                memory.emit(TermLinkRemove.class, removed, this);</span>
+            }
+        }
+<span class="fc" id="L428">        memory.emit(TermLinkAdd.class, termLink, this);</span>
+<span class="fc" id="L429">        return true;        </span>
+    }
+
+    /**
+     * Return a string representation of the concept, called in ConceptBag only
+     *
+     * @return The concept name, with taskBudget in the full version
+     */
+    @Override
+    public String toString() {  // called from concept bag
+        //return (super.toStringBrief() + &quot; &quot; + key);
+<span class="nc" id="L440">        return super.toStringExternal();</span>
+    }
+
+    /**
+     * called from {@link Shell}
+     */
+    @Override
+    public String toStringLong() {
+<span class="nc" id="L448">        final String res =</span>
+<span class="nc" id="L449">                toStringExternal() + &quot; &quot; + term.name()</span>
+<span class="nc" id="L450">                + toStringIfNotNull(termLinks.size(), &quot;termLinks&quot;)</span>
+<span class="nc" id="L451">                + toStringIfNotNull(taskLinks.size(), &quot;taskLinks&quot;)</span>
+<span class="nc" id="L452">                + toStringIfNotNull(beliefs.size(), &quot;beliefs&quot;)</span>
+<span class="nc" id="L453">                + toStringIfNotNull(desires.size(), &quot;desires&quot;)</span>
+<span class="nc" id="L454">                + toStringIfNotNull(questions.size(), &quot;questions&quot;)</span>
+<span class="nc" id="L455">                + toStringIfNotNull(quests.size(), &quot;quests&quot;);</span>
+        
+                //+ toStringIfNotNull(null, &quot;questions&quot;);
+        /*for (Task t : questions) {
+            res += t.toString();
+        }*/
+        // TODO other details?
+<span class="nc" id="L462">        return res;</span>
+    }
+
+    private String toStringIfNotNull(final Object item, final String title) {
+<span class="nc bnc" id="L466" title="All 2 branches missed.">        if (item == null) {</span>
+<span class="nc" id="L467">            return &quot;&quot;;</span>
+        }
+
+<span class="nc" id="L470">        final String itemString = item.toString();</span>
+
+<span class="nc" id="L472">        return new StringBuilder(2 + title.length() + itemString.length() + 1).</span>
+<span class="nc" id="L473">                append(&quot; &quot;).append(title).append(':').append(itemString).toString();</span>
+    }
+    
+    
+<span class="fc" id="L477">    public float acquiredQuality = 0.0f;</span>
+    public void incAcquiredQuality() {
+<span class="fc" id="L479">        acquiredQuality+=0.1f;</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        if(acquiredQuality &gt; 1.0f) {</span>
+<span class="fc" id="L481">            acquiredQuality = 1.0f;</span>
+        }
+<span class="fc" id="L483">    }</span>
+    /**
+     * Recalculate the quality of the concept [to be refined to show
+     * extension/intension balance]
+     *
+     * @return The quality value
+     */
+    @Override
+    public float getQuality() {
+<span class="fc" id="L492">        final float linkPriority = termLinks.getAveragePriority();</span>
+<span class="fc" id="L493">        final float termComplexityFactor = 1.0f / (term.getComplexity()*memory.narParameters.COMPLEXITY_UNIT);</span>
+<span class="fc" id="L494">        final float result = or(acquiredQuality, linkPriority, termComplexityFactor);</span>
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">        if (result &lt; 0) {</span>
+<span class="nc" id="L496">            throw new IllegalStateException(&quot;Concept.getQuality &lt; 0:  result=&quot; + result + &quot;, linkPriority=&quot; + linkPriority + &quot; ,termComplexityFactor=&quot; + termComplexityFactor + &quot;, termLinks.size=&quot; + termLinks.size());</span>
+        }
+<span class="fc" id="L498">        return result;</span>
+    }
+
+    /**
+     * Return the templates for TermLinks, only called in
+     * Memory.continuedProcess
+     *
+     * @return The template get
+     */
+    public List&lt;TermLink&gt; getTermLinkTemplates() {
+<span class="nc" id="L508">        return termLinkTemplates;</span>
+    }
+
+    /**
+     * Select a isBelief to interact with the given task in inference
+     * &lt;p&gt;
+     * get the first qualified one
+     * &lt;p&gt;
+     * only called in RuleTables.reason
+     *
+     * @param task The selected task
+     * @return The selected isBelief
+     */
+    public Sentence getBelief(final DerivationContext nal, final Task task) {
+<span class="fc" id="L522">        final Stamp taskStamp = task.sentence.stamp;</span>
+<span class="fc" id="L523">        final long currentTime = nal.time.time();</span>
+
+<span class="fc bfc" id="L525" title="All 2 branches covered.">        for (final Task beliefT : beliefs) {  </span>
+<span class="fc" id="L526">            final Sentence belief = beliefT.sentence;</span>
+<span class="fc" id="L527">            nal.emit(BeliefSelect.class, belief);</span>
+<span class="fc" id="L528">            nal.setTheNewStamp(taskStamp, belief.stamp, currentTime);</span>
+            
+<span class="fc" id="L530">            final Sentence projectedBelief = belief.projection(taskStamp.getOccurrenceTime(), nal.time.time(), nal.memory);</span>
+            /*if (projectedBelief.getOccurenceTime() != belief.getOccurenceTime()) {
+               nal.singlePremiseTask(projectedBelief, task.budget);
+            }*/
+            
+<span class="fc" id="L535">            return projectedBelief;     // return the first satisfying belief</span>
+        }
+<span class="fc" id="L537">        return null;</span>
+    }
+
+    /**
+     * Get the current overall desire value. TODO to be refined
+     */
+    public TruthValue getDesire() {
+<span class="nc bnc" id="L544" title="All 2 branches missed.">        if (desires.isEmpty()) {</span>
+<span class="nc" id="L545">            return null;</span>
+        }
+<span class="nc" id="L547">        final TruthValue topValue = desires.get(0).sentence.truth;</span>
+<span class="nc" id="L548">        return topValue;</span>
+    }
+    
+    /**
+     * Replace default to prevent repeated inference, by checking TaskLink
+     *
+     * @param taskLink The selected TaskLink
+     * @param time The current time
+     * @return The selected TermLink
+     */
+    public TermLink selectTermLink(final TaskLink taskLink, final long time, final Parameters narParameters) {
+<span class="fc" id="L559">        final int toMatch = narParameters.TERM_LINK_MAX_MATCHED; //Math.min(memory.param.termLinkMaxMatched.get(), termLinks.size());</span>
+<span class="pc bpc" id="L560" title="1 of 4 branches missed.">        for (int i = 0; (i &lt; toMatch) &amp;&amp; (termLinks.size() &gt; 0); i++) {</span>
+            
+<span class="fc" id="L562">            final TermLink termLink = termLinks.takeOut();</span>
+<span class="pc bpc" id="L563" title="1 of 2 branches missed.">            if (termLink==null)</span>
+<span class="nc" id="L564">                break;</span>
+            
+<span class="fc bfc" id="L566" title="All 2 branches covered.">            if (taskLink.novel(termLink, time, narParameters)) {</span>
+                //return, will be re-inserted in caller method when finished processing it
+<span class="fc" id="L568">                return termLink;</span>
+            }
+            //just put back since it isn't novel
+<span class="fc" id="L571">            returnTermLink(termLink);</span>
+        }
+<span class="fc" id="L573">        return null;</span>
+
+    }
+
+    public void returnTermLink(final TermLink termLink) {
+<span class="fc" id="L578">        termLinks.putBack(termLink, memory.cycles(memory.narParameters.TERMLINK_FORGET_DURATIONS), memory);</span>
+<span class="fc" id="L579">    }</span>
+
+    /**
+     * Return the questions, called in ComposionalRules in
+     * dedConjunctionByQuestion only
+     */
+    public List&lt;Task&gt; getQuestions() {
+<span class="nc" id="L586">        return Collections.unmodifiableList(questions);</span>
+    }
+    public List&lt;Task&gt; getQuess() {
+<span class="nc" id="L589">        return Collections.unmodifiableList(quests);</span>
+    }
+
+    public void discountConfidence(final boolean onBeliefs) {
+<span class="fc bfc" id="L593" title="All 2 branches covered.">        if (onBeliefs) {</span>
+<span class="fc bfc" id="L594" title="All 2 branches covered.">            for (final Task t : beliefs) {</span>
+<span class="fc" id="L595">                t.sentence.discountConfidence(memory.narParameters);</span>
+<span class="fc" id="L596">            }</span>
+        } else {
+<span class="fc bfc" id="L598" title="All 2 branches covered.">            for (final Task t : desires) {</span>
+<span class="fc" id="L599">                t.sentence.discountConfidence(memory.narParameters);</span>
+<span class="fc" id="L600">            }</span>
+        }
+<span class="fc" id="L602">    }</span>
+
+    public NativeOperator operator() {
+<span class="nc" id="L605">        return term.operator();</span>
+    }
+
+    public Term getTerm() {
+<span class="fc" id="L609">        return term;</span>
+    }
+
+    /** returns unmodifidable collection wrapping beliefs */
+    public List&lt;Task&gt; getBeliefs() {
+<span class="nc" id="L614">        return Collections.unmodifiableList(beliefs);</span>
+    }
+    
+    /** returns unmodifidable collection wrapping beliefs */
+    public List&lt;Task&gt; getDesires() {
+<span class="nc" id="L619">        return Collections.unmodifiableList(desires);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

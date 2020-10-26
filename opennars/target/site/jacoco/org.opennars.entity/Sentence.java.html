@@ -1,0 +1,585 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Sentence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.entity</a> &gt; <span class="el_source">Sentence.java</span></div><h1>Sentence.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.entity;
+
+import org.opennars.inference.TemporalRules;
+import org.opennars.inference.TruthFunctions;
+import org.opennars.inference.TruthFunctions.EternalizedTruthValue;
+import org.opennars.io.Symbols;
+import org.opennars.io.Texts;
+import org.opennars.language.*;
+import org.opennars.main.Nar;
+import org.opennars.main.Debug;
+
+import java.io.Serializable;
+import java.util.*;
+import org.opennars.main.Parameters;
+import org.opennars.storage.Memory;
+
+/**
+ * Sentence as defined by the NARS-theory
+ *
+ * A Sentence is used as the premises and conclusions of all inference rules.
+ *
+ * @author Pei Wang
+ * @author Patrick Hammer
+ */
+public class Sentence&lt;T extends Term&gt; implements Cloneable, Serializable {
+
+<span class="fc" id="L50">    public boolean producedByTemporalInduction=false;</span>
+
+    /**
+     * The content of a Sentence is a Term
+     */
+    public final T term;
+    
+    /**
+     * The punctuation indicates the type of the Sentence:
+     * Judgment '.', Question '?', Goal '!', or Quest '@'
+     */
+    public final char punctuation;
+    
+    /**
+     * The truth value of Judgment, or desire value of Goal     
+     */
+    public final TruthValue truth;
+    
+    /**
+     * Partial record of the derivation path
+     */
+    public final Stamp stamp;
+
+    /**
+     * Whether the sentence can be revised
+     */
+    private boolean revisible;
+
+    /**
+     * caches the 'getKey()' result
+     */
+    private CharSequence key;
+
+    private final int hash;
+    
+    
+    public Sentence(final T term, final char punctuation, final TruthValue newTruth, final Stamp newStamp) {
+<span class="fc" id="L87">        this(term, punctuation, newTruth, newStamp, true);</span>
+<span class="fc" id="L88">    }</span>
+    
+    /**
+     * Create a Sentence with the given fields
+     *
+     * @param _content The Term that forms the content of the sentence
+     * @param punctuation The punctuation indicating the type of the sentence
+     * @param truth The truth value of the sentence, null for question
+     * @param stamp The stamp of the sentence indicating its derivation time and
+     * base
+     */
+<span class="fc" id="L99">    private Sentence(T _content, final char punctuation, final TruthValue truth, final Stamp stamp, final boolean normalize) {</span>
+        
+        //cut interval at end for sentence in serial conjunction, and inbetween for parallel
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if(punctuation!=Symbols.TERM_NORMALIZING_WORKAROUND_MARK) {</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if(_content instanceof Conjunction) {</span>
+<span class="fc" id="L104">                final Conjunction c=(Conjunction)_content;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                if(c.getTemporalOrder()==TemporalRules.ORDER_FORWARD) {</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                    if(c.term[c.term.length-1] instanceof Interval) {</span>
+<span class="fc" id="L107">                        long time=0; </span>
+                        //refined:
+<span class="fc" id="L109">                        int u = 0;</span>
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">                        while(c.term.length-1-u &gt;= 0 &amp;&amp; c.term[c.term.length-1-u] instanceof Interval) {</span>
+<span class="fc" id="L111">                            time += ((Interval)c.term[c.term.length-1-u]).time;</span>
+<span class="fc" id="L112">                            u++;</span>
+                        }
+                        
+<span class="fc" id="L115">                        final Term[] term2=new Term[c.term.length-u];</span>
+<span class="fc" id="L116">                        System.arraycopy(c.term, 0, term2, 0, term2.length);</span>
+<span class="fc" id="L117">                        _content=(T) Conjunction.make(term2, c.getTemporalOrder(), c.isSpatial);</span>
+                        //ok we removed a part of the interval, we have to transform the occurence time of the sentence back
+                        //accordingly
+                        
+<span class="pc bpc" id="L121" title="2 of 6 branches missed.">                        if(!c.isSpatial &amp;&amp; stamp!=null &amp;&amp; stamp.getOccurrenceTime() != Stamp.ETERNAL)</span>
+<span class="fc" id="L122">                            stamp.setOccurrenceTime(stamp.getOccurrenceTime()-time);</span>
+                    }
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                    if(c.term[0] instanceof Interval) {</span>
+<span class="fc" id="L125">                        long time=0; </span>
+                        //refined:
+<span class="fc" id="L127">                        int u = 0;</span>
+<span class="pc bpc" id="L128" title="1 of 4 branches missed.">                        while(u &lt; c.term.length &amp;&amp; (c.term[u] instanceof Interval)) {</span>
+<span class="fc" id="L129">                            time += ((Interval)c.term[u]).time;</span>
+<span class="fc" id="L130">                            u++;</span>
+                        }
+                        
+<span class="fc" id="L133">                        final Term[] term2=new Term[c.term.length-u];</span>
+<span class="fc" id="L134">                        System.arraycopy(c.term, u, term2, 0, term2.length);</span>
+<span class="fc" id="L135">                        _content=(T) Conjunction.make(term2, c.getTemporalOrder(), c.isSpatial);</span>
+                        //ok we removed a part of the interval, we have to transform the occurence time of the sentence back
+                        //accordingly
+                        
+<span class="pc bpc" id="L139" title="2 of 6 branches missed.">                        if(!c.isSpatial &amp;&amp; stamp!=null &amp;&amp; stamp.getOccurrenceTime() != Stamp.ETERNAL)</span>
+<span class="fc" id="L140">                            stamp.setOccurrenceTime(stamp.getOccurrenceTime()+time);</span>
+                    }
+                }
+            }
+        }
+        
+<span class="fc" id="L146">        this.punctuation = punctuation;</span>
+
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if( truth != null ) {</span>
+<span class="fc bfc" id="L149" title="All 4 branches covered.">            if (_content instanceof Implication || _content instanceof Equivalence) {</span>
+<span class="fc bfc" id="L150" title="All 4 branches covered.">                if (((Statement) _content).getSubject().hasVarIndep() &amp;&amp; !((Statement) _content).getPredicate().hasVarIndep())</span>
+<span class="fc" id="L151">                    truth.setConfidence(0.0f);</span>
+<span class="fc bfc" id="L152" title="All 4 branches covered.">                if (((Statement) _content).getPredicate().hasVarIndep() &amp;&amp; !((Statement) _content).getSubject().hasVarIndep())</span>
+<span class="fc" id="L153">                    truth.setConfidence(0.0f); //TODO:</span>
+<span class="pc bpc" id="L154" title="3 of 4 branches missed.">            } else if (_content instanceof Interval &amp;&amp; punctuation != Symbols.TERM_NORMALIZING_WORKAROUND_MARK) {</span>
+<span class="nc" id="L155">                truth.setConfidence(0.0f); //do it that way for now, because else further inference is interrupted.</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                if (Debug.DETAILED &amp;&amp; Debug.DETAILED_SENTENCES)</span>
+                    throw new IllegalStateException(&quot;Sentence content must not be Interval: &quot; + _content + punctuation + &quot; &quot; + stamp);
+            }
+
+<span class="pc bpc" id="L160" title="5 of 8 branches missed.">            if ((!isQuestion() &amp;&amp; !isQuest()) &amp;&amp; (truth == null) &amp;&amp; punctuation != Symbols.TERM_NORMALIZING_WORKAROUND_MARK) {</span>
+<span class="nc" id="L161">                throw new IllegalStateException(&quot;Judgment and Goal sentences require non-null truth value&quot;);</span>
+            }
+
+<span class="pc bpc" id="L164" title="3 of 4 branches missed.">            if (_content.subjectOrPredicateIsIndependentVar() &amp;&amp; punctuation != Symbols.TERM_NORMALIZING_WORKAROUND_MARK) {</span>
+<span class="nc" id="L165">                truth.setConfidence(0.0f); //do it that way for now, because else further inference is interrupted.</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                if (Debug.DETAILED &amp;&amp; Debug.DETAILED_SENTENCES)</span>
+                    throw new IllegalStateException(&quot;A statement sentence is not allowed to have a independent variable as subj or pred&quot;);
+            }
+
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">            if (Debug.DETAILED &amp;&amp; Debug.DETAILED_SENTENCES &amp;&amp; punctuation != Symbols.TERM_NORMALIZING_WORKAROUND_MARK) {</span>
+                if (!Term.valid(_content)) {
+                    final CompoundTerm.UnableToCloneException ntc = new CompoundTerm.UnableToCloneException(&quot;Invalid term discovered &quot; + _content);
+                    ntc.printStackTrace();
+                    throw ntc;
+                }
+            }
+        }
+        
+<span class="pc bpc" id="L179" title="1 of 8 branches missed.">        if ((isQuestion() || isQuest()) &amp;&amp; punctuation!=Symbols.TERM_NORMALIZING_WORKAROUND_MARK &amp;&amp; !stamp.isEternal()) {</span>
+<span class="fc" id="L180">            stamp.setEternal();</span>
+            //throw new IllegalStateException(&quot;Questions and Quests require eternal tense&quot;);
+        }
+        
+<span class="fc" id="L184">        this.truth = truth;</span>
+<span class="fc" id="L185">        this.stamp = stamp;</span>
+<span class="fc bfc" id="L186" title="All 6 branches covered.">        this.revisible = _content instanceof Implication || _content instanceof Equivalence || !(_content.hasVarDep());</span>
+
+<span class="fc" id="L188">        T newTerm = null;</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if( _content instanceof CompoundTerm)</span>
+<span class="fc" id="L190">            newTerm = (T)((CompoundTerm)_content).cloneDeepVariables();</span>
+        
+        //Variable name normalization
+        //TODO move this to Concept method, like cloneNormalized()
+<span class="fc bfc" id="L194" title="All 8 branches covered.">        if ( newTerm != null &amp;&amp; normalize &amp;&amp; _content.hasVar() &amp;&amp; (!((CompoundTerm)_content).isNormalized() ) ) {</span>
+            
+<span class="fc" id="L196">            this.term = newTerm;</span>
+<span class="fc" id="L197">            final CompoundTerm c = (CompoundTerm)term;</span>
+<span class="fc" id="L198">            final List&lt;Variable&gt; vars = new ArrayList(); //may contain duplicates, list for efficiency</span>
+
+<span class="fc" id="L200">            c.recurseSubtermsContainingVariables((t, parent) -&gt; {</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">                if (t instanceof Variable) {</span>
+<span class="fc" id="L202">                    final Variable v = ((Variable) t);</span>
+<span class="fc" id="L203">                    vars.add(v);</span>
+                }
+<span class="fc" id="L205">            });</span>
+
+<span class="fc" id="L207">            final Map&lt;CharSequence, CharSequence&gt; rename = new LinkedHashMap();</span>
+<span class="fc" id="L208">            boolean renamed = false;</span>
+
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            for (final Variable v : vars) {</span>
+<span class="fc" id="L211">                CharSequence vname = v.name();</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                if (!v.hasVarIndep())</span>
+<span class="fc" id="L213">                    vname = vname + &quot; &quot; + v.getScope().name();</span>
+<span class="fc" id="L214">                CharSequence n = rename.get(vname);</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                if (n == null) {</span>
+                    //type + id
+<span class="fc" id="L217">                    rename.put(vname, n = Variable.getName(v.getType(), rename.size() + 1));</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">                    if (!n.equals(vname))</span>
+<span class="fc" id="L219">                        renamed = true;</span>
+                }
+
+<span class="fc" id="L222">                v.setScope(c, n);</span>
+<span class="fc" id="L223">            }</span>
+
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            if (renamed) {</span>
+<span class="fc" id="L226">                c.invalidateName();</span>
+
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">                if (Debug.DETAILED &amp;&amp; Debug.DETAILED_SENTENCES) {</span>
+                    if (!Term.valid(c)) {
+                        final CompoundTerm.UnableToCloneException ntc = new CompoundTerm.UnableToCloneException(&quot;Invalid term discovered after normalization: &quot; + c + &quot; ; prior to normalization: &quot; + _content);
+                        ntc.printStackTrace();
+                        throw ntc;
+                    }
+                }
+
+            }
+<span class="fc" id="L237">            c.setNormalized(true);</span>
+<span class="fc" id="L238">        }</span>
+        else {
+<span class="fc" id="L240">            this.term = _content;</span>
+        }
+    
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (isNotTermlinkNormalizer())</span>
+<span class="fc" id="L244">            this.hash = Objects.hash(term, punctuation, truth, stamp.getOccurrenceTime());</span>
+        else 
+<span class="fc" id="L246">            this.hash = Objects.hash(term, punctuation, truth );</span>
+<span class="fc" id="L247">    }</span>
+
+    protected boolean isNotTermlinkNormalizer() {
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        return punctuation != Symbols.TERM_NORMALIZING_WORKAROUND_MARK;</span>
+    }
+    
+    /**
+     * To check whether two sentences are equal
+     *
+     * @param that The other sentence
+     * @return Whether the two sentences have the same content
+     */
+    @Override
+    public boolean equals(final Object that) {
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        if (this == that) return true;</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (that instanceof Sentence) {</span>
+<span class="fc" id="L263">            final Sentence t = (Sentence) that;</span>
+            
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            if (hash!=t.hash) return false;</span>
+            
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            if (punctuation!=t.punctuation) return false;</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            if (isNotTermlinkNormalizer()) {</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                if (stamp.getOccurrenceTime()!=t.stamp.getOccurrenceTime()) return false;</span>
+            }                
+            
+<span class="fc bfc" id="L272" title="All 2 branches covered.">            if (truth==null) {</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">                if (t.truth!=null) return false;</span>
+            }
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">            else if (t.truth==null) {</span>
+<span class="nc" id="L276">                return false;</span>
+            }
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            else if (!truth.equals(t.truth)) return false;            </span>
+            
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">            if (!term.equals(t.term)) return false;</span>
+            
+<span class="pc bpc" id="L282" title="3 of 4 branches missed.">            if(term.term_indices != null &amp;&amp; t.term.term_indices != null) {</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">                for(int i=0;i&lt;term.term_indices.length;i++) {</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">                    if(term.term_indices[i] != t.term.term_indices[i]) {</span>
+<span class="nc" id="L285">                        return false; //position or scale was different</span>
+                    }
+                }
+            }
+
+<span class="fc" id="L290">            return stamp.equals(t.stamp, false, true, true);</span>
+        }
+<span class="nc" id="L292">        return false;</span>
+    }
+
+    /**
+     * To produce the hashcode of a sentence
+     *
+     * @return a hashcode
+     */
+    @Override
+    public int hashCode() {
+<span class="fc" id="L302">        return hash;</span>
+    }
+
+    /**
+     * Clone the Sentence
+     *
+     * @return The cloned Sentence
+     */
+    @Override
+    public Sentence clone() {
+<span class="fc" id="L312">        return clone(term);</span>
+    }
+
+    public Sentence clone(final boolean makeEternal) {
+<span class="nc" id="L316">        final Sentence clon = clone(term);</span>
+<span class="nc bnc" id="L317" title="All 4 branches missed.">        if(clon.stamp.getOccurrenceTime()!=Stamp.ETERNAL &amp;&amp; makeEternal) {</span>
+            //change occurence time of clone
+<span class="nc" id="L319">            clon.stamp.setEternal();</span>
+        }
+<span class="nc" id="L321">        return clon;</span>
+    }
+
+    /**
+     * clone with a different term
+     *
+     * @param t term which has to get cloned
+     * @return sentence with the cloned term as a property
+     */
+    public final Sentence clone(final Term t) {
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        return new Sentence(</span>
+            t,
+            punctuation,
+            truth!=null ? new TruthValue(truth) : null,
+<span class="fc" id="L335">            stamp.clone());</span>
+    }
+
+    /**
+      * project a judgment to a difference occurrence time
+      *
+      * @param targetTime The time to be projected into
+      * @param currentTime The current time as a reference
+      * @return The projected belief
+      */    
+    public Sentence projection(final long targetTime, final long currentTime, Memory mem) {
+            
+<span class="fc" id="L347">        final TruthValue newTruth = projectionTruth(targetTime, currentTime, mem);</span>
+<span class="fc" id="L348">        final boolean eternalizing = (newTruth instanceof EternalizedTruthValue);</span>
+                
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        final Stamp newStamp = eternalizing ? stamp.cloneWithNewOccurrenceTime(Stamp.ETERNAL) :</span>
+<span class="fc" id="L351">                                        stamp.cloneWithNewOccurrenceTime(targetTime);</span>
+        
+<span class="fc" id="L353">        return new Sentence(</span>
+            term,
+            punctuation,
+            newTruth,
+            newStamp,
+            false);
+    }
+
+    
+    public TruthValue projectionTruth(final long targetTime, final long currentTime, Memory mem) {
+<span class="fc" id="L363">        TruthValue newTruth = null;</span>
+                        
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        if (!stamp.isEternal()) {</span>
+<span class="fc" id="L366">            newTruth = TruthFunctions.eternalize(truth, mem.narParameters);</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">            if (targetTime != Stamp.ETERNAL) {</span>
+<span class="fc" id="L368">                final long occurrenceTime = stamp.getOccurrenceTime();</span>
+<span class="fc" id="L369">                final float factor = TruthFunctions.temporalProjection(occurrenceTime, targetTime, currentTime, mem.narParameters);</span>
+<span class="fc" id="L370">                final double projectedConfidence = factor * truth.getConfidence();</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">                if (projectedConfidence &gt; newTruth.getConfidence()) {</span>
+<span class="fc" id="L372">                    newTruth = new TruthValue(truth.getFrequency(), projectedConfidence, mem.narParameters);</span>
+                }
+            }
+        }
+        
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        if (newTruth == null) newTruth = truth.clone();</span>
+        
+<span class="fc" id="L379">        return newTruth;</span>
+    }
+
+    /**
+     * @return property, whether the object is a judgment
+     */
+    public boolean isJudgment() {
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        return (punctuation == Symbols.JUDGMENT_MARK);</span>
+    }
+    
+    /**
+     * @return property, whether the object is a question
+     */
+    public boolean isQuestion() {
+<span class="fc bfc" id="L393" title="All 2 branches covered.">        return (punctuation == Symbols.QUESTION_MARK);</span>
+    }
+    
+    /**
+     * @return property, whether the sentence is a goal
+     */
+    public boolean isGoal() {
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        return (punctuation == Symbols.GOAL_MARK);</span>
+    }
+    
+    /**
+     * @return property, whether the sentence is a quest
+     */
+    public boolean isQuest() {
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        return (punctuation == Symbols.QUEST_MARK);</span>
+    }    
+
+    /**
+     * @return property of the ability to revise the sentence
+     */
+    public boolean getRevisible() {
+<span class="fc" id="L414">        return revisible;</span>
+    }
+    
+    public void setRevisible(final boolean b) {
+<span class="nc" id="L418">        revisible = b;</span>
+<span class="nc" id="L419">    }</span>
+
+    public int getTemporalOrder() {
+<span class="fc" id="L422">        return term.getTemporalOrder();</span>
+    }
+    
+    public long getOccurenceTime() {
+<span class="fc" id="L426">        return stamp.getOccurrenceTime();</span>
+    }  
+    
+    /**
+     * Get a String representation of the sentence
+     *
+     * @return The String
+     */
+    @Override
+    public String toString() {
+<span class="fc" id="L436">        return getKey().toString();</span>
+    }
+
+ 
+    /**
+     * Get a String representation of the sentence for key of Task and TaskLink
+     *
+     * @return The String
+     */
+    public CharSequence getKey() {
+        //key must be invalidated if content or truth change
+<span class="fc bfc" id="L447" title="All 2 branches covered.">        if (key == null) {</span>
+<span class="fc" id="L448">            final CharSequence contentName = term.name();</span>
+            
+<span class="fc bfc" id="L450" title="All 4 branches covered.">            final boolean showOcurrenceTime = ((punctuation == Symbols.JUDGMENT_MARK) || (punctuation == Symbols.QUESTION_MARK));</span>
+
+<span class="fc" id="L452">            int stringLength = 0;</span>
+<span class="fc bfc" id="L453" title="All 2 branches covered.">            if (truth != null) {</span>
+<span class="fc bfc" id="L454" title="All 2 branches covered.">                stringLength += (showOcurrenceTime ? 8 : 0) + 11 /*truthString.length()*/;</span>
+            }
+
+<span class="fc" id="L457">            String conv = &quot;&quot;;</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">            if(term.term_indices != null) {</span>
+<span class="nc" id="L459">                conv = &quot; [i,j,k,l]=[&quot;;</span>
+<span class="nc bnc" id="L460" title="All 2 branches missed.">                for(int i = 0; i&lt;4; i++) { //skip min sizes</span>
+<span class="nc" id="L461">                    conv += String.valueOf(term.term_indices[i])+&quot;,&quot;;</span>
+                }
+<span class="nc" id="L463">                conv = conv.substring(0, conv.length()-1) + &quot;]&quot;;</span>
+            }
+            
+            //suffix = [punctuation][ ][truthString][ ][occurenceTimeString]
+<span class="fc" id="L467">            final StringBuilder suffix = new StringBuilder(stringLength).append(punctuation).append(conv);</span>
+
+<span class="fc bfc" id="L469" title="All 2 branches covered.">            if (truth != null) {</span>
+<span class="fc" id="L470">                suffix.append(' ');</span>
+<span class="fc" id="L471">                truth.appendString(suffix, false);</span>
+            }
+<span class="pc bpc" id="L473" title="1 of 4 branches missed.">            if ((showOcurrenceTime) &amp;&amp; (stamp!=null)) {</span>
+<span class="fc" id="L474">                suffix.append(' ');</span>
+<span class="fc" id="L475">                stamp.appendOcurrenceTime(suffix);</span>
+            }
+
+<span class="fc" id="L478">            key = Texts.yarn( </span>
+                    contentName,
+                    suffix);
+        }
+<span class="fc" id="L482">        return key;</span>
+    }
+
+    /**
+     * @param nar Reasoner instance
+     * @param showStamp must the stamp get appended to the string?
+     * @return textural representation of the sentence for humans
+     */
+    public CharSequence toString(final Nar nar, final boolean showStamp) {
+    
+<span class="fc" id="L492">        final CharSequence contentName = term.name();</span>
+        
+<span class="fc" id="L494">        final long t = nar.time();</span>
+
+<span class="fc" id="L496">        final long diff=stamp.getOccurrenceTime()-nar.time();</span>
+<span class="fc" id="L497">        final long diffabs = Math.abs(diff);</span>
+        
+<span class="fc" id="L499">        String timediff = &quot;&quot;;</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        if(diffabs &lt; nar.narParameters.DURATION) {</span>
+<span class="fc" id="L501">            timediff = &quot;|&quot;;</span>
+        }
+        else {
+<span class="fc" id="L504">            final Long Int = diffabs;</span>
+<span class="fc bfc" id="L505" title="All 2 branches covered.">            timediff = diff&gt;0 ? &quot;+&quot;+String.valueOf(Int) : &quot;-&quot;+String.valueOf(Int);</span>
+        }
+        
+<span class="pc bpc" id="L508" title="1 of 2 branches missed.">        if(Debug.TEST) {</span>
+<span class="fc" id="L509">            timediff = &quot;!&quot;+String.valueOf(stamp.getOccurrenceTime());</span>
+        }
+        
+<span class="fc" id="L512">        String tenseString = &quot;:&quot;+timediff+&quot;:&quot;;</span>
+<span class="fc bfc" id="L513" title="All 2 branches covered.">        if(stamp.getOccurrenceTime() == Stamp.ETERNAL)</span>
+<span class="fc" id="L514">            tenseString=&quot;&quot;;</span>
+        
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">        final CharSequence stampString = showStamp ? stamp.name() : null;</span>
+        
+<span class="fc" id="L518">        int stringLength = contentName.length() + tenseString.length() + 1 + 1;</span>
+                
+<span class="fc bfc" id="L520" title="All 2 branches covered.">        if (truth != null)</span>
+<span class="fc" id="L521">            stringLength += 11;</span>
+        
+<span class="pc bpc" id="L523" title="1 of 2 branches missed.">        if (showStamp)</span>
+<span class="nc" id="L524">            stringLength += stampString.length()+1;</span>
+        
+<span class="fc" id="L526">        String conv = &quot;&quot;;</span>
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">        if(term.term_indices != null) {</span>
+<span class="nc" id="L528">            conv = &quot; [i,j,k,l]=[&quot;;</span>
+<span class="nc bnc" id="L529" title="All 2 branches missed.">            for(int i = 0; i&lt;4; i++) { //skip min sizes</span>
+<span class="nc" id="L530">                conv += String.valueOf(term.term_indices[i])+&quot;,&quot;;</span>
+            }
+<span class="nc" id="L532">            conv = conv.substring(0, conv.length()-1) + &quot;]&quot;;</span>
+        }
+        
+<span class="fc" id="L535">        final StringBuilder buffer = new StringBuilder(stringLength).</span>
+<span class="fc" id="L536">                    append(contentName).append(punctuation).append(conv);</span>
+        
+<span class="fc bfc" id="L538" title="All 2 branches covered.">        if (tenseString.length() &gt; 0)</span>
+<span class="fc" id="L539">            buffer.append(' ').append(tenseString);</span>
+        
+<span class="fc bfc" id="L541" title="All 2 branches covered.">        if (truth != null) {</span>
+<span class="fc" id="L542">            buffer.append(' ');</span>
+<span class="fc" id="L543">            truth.appendString(buffer, true);</span>
+        }
+        
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">        if (showStamp)</span>
+<span class="nc" id="L547">            buffer.append(' ').append(stampString);</span>
+        
+<span class="fc" id="L549">        return buffer;</span>
+    }
+    
+   
+    /**
+     * discounts the truth value of the sentence
+     *
+     */
+    public void discountConfidence(Parameters narParameters) {
+<span class="fc" id="L558">        truth.setConfidence(truth.getConfidence() * narParameters.DISCOUNT_RATE).setAnalytic(false);</span>
+<span class="fc" id="L559">    }</span>
+
+    /**
+     *
+     * @return classification if the sentence is true for ever
+     */
+    public boolean isEternal() {
+<span class="fc" id="L566">        return stamp.isEternal();</span>
+    }
+
+    /**
+     *
+     * @return term of the sentence, terms are properties of sentences
+     */
+    public T getTerm() {
+<span class="fc" id="L574">        return term;</span>
+    }
+
+    /**
+     *
+     * @return truth of the sentence, truths are properties of sentences
+     */
+    public TruthValue getTruth() {
+<span class="fc" id="L582">        return truth;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Feel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.operator.mental</a> &gt; <span class="el_source">Feel.java</span></div><h1>Feel.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.operator.mental;
+
+import com.google.common.collect.Lists;
+import org.opennars.entity.*;
+import org.opennars.inference.BudgetFunctions;
+import org.opennars.interfaces.Timable;
+import org.opennars.io.Symbols;
+import org.opennars.language.Inheritance;
+import org.opennars.language.SetInt;
+import org.opennars.language.Tense;
+import org.opennars.language.Term;
+import org.opennars.operator.Operator;
+import org.opennars.storage.Memory;
+
+import java.util.List;
+
+/**
+ * Feeling common operations
+ */
+public abstract class Feel extends Operator {
+    private final Term feelingTerm;
+
+    public Feel(final String name) {
+<span class="fc" id="L47">        super(name);</span>
+        
+        // remove the &quot;^feel&quot; prefix from name
+<span class="fc" id="L50">        this.feelingTerm = Term.get(((String)name()).substring(5).toLowerCase());</span>
+<span class="fc" id="L51">    }</span>
+
+<span class="fc" id="L53">    final static Term selfSubject = Term.SELF;</span>
+    
+    /**
+     * To get the current value of an internal sensor
+     *
+     * @param value The value to be checked, in [0, 1]
+     * @param memory The memory in which the operation is executed
+     * @return Immediate results as Tasks
+     */
+    protected List&lt;Task&gt; feeling(final float value, final Memory memory, final Timable time) {
+<span class="nc" id="L63">        final Stamp stamp = new Stamp(time, memory, Tense.Present);</span>
+<span class="nc" id="L64">        final TruthValue truth = new TruthValue(value, memory.narParameters.DEFAULT_JUDGMENT_CONFIDENCE, memory.narParameters);</span>
+                
+<span class="nc" id="L66">        final Term predicate = new SetInt(feelingTerm);</span>
+        
+<span class="nc" id="L68">        final Term content = Inheritance.make(selfSubject, predicate);</span>
+<span class="nc" id="L69">        final Sentence sentence = new Sentence(</span>
+            content,
+            Symbols.JUDGMENT_MARK,
+            truth,
+            stamp);
+
+<span class="nc" id="L75">        final float quality = BudgetFunctions.truthToQuality(truth);</span>
+<span class="nc" id="L76">        final BudgetValue budget = new BudgetValue(memory.narParameters.DEFAULT_JUDGMENT_PRIORITY, memory.narParameters.DEFAULT_JUDGMENT_DURABILITY, quality, memory.narParameters);</span>
+
+<span class="nc" id="L78">        final Task newTask = new Task(sentence, budget, Task.EnumType.INPUT);</span>
+<span class="nc" id="L79">        return Lists.newArrayList(newTask);</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

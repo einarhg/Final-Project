@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Abbreviation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.plugin.mental</a> &gt; <span class="el_source">Abbreviation.java</span></div><h1>Abbreviation.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.plugin.mental;
+
+import com.google.common.collect.Lists;
+import org.opennars.entity.*;
+import org.opennars.inference.BudgetFunctions;
+import org.opennars.interfaces.Timable;
+import org.opennars.io.Symbols;
+import org.opennars.io.events.EventEmitter.EventObserver;
+import org.opennars.io.events.Events.TaskDerive;
+import org.opennars.language.Similarity;
+import org.opennars.language.Term;
+import org.opennars.main.Nar;
+import org.opennars.operator.Operation;
+import org.opennars.operator.Operator;
+import org.opennars.plugin.Plugin;
+import org.opennars.storage.Memory;
+
+import java.util.List;
+
+import static org.opennars.language.CompoundTerm.termArray;
+
+/**
+ * 1-step abbreviation, which calls ^abbreviate directly and not through an added Task.
+ * Experimental alternative to Abbreviation plugin.
+ */
+public class Abbreviation implements Plugin {
+    public EventObserver obs;
+
+    //TODO different parameters for priorities and budgets of both the abbreviation process and the resulting abbreviation judgment
+    //public PortableDouble priorityFactor = new PortableDouble(1.0);
+
+
+<span class="nc" id="L56">    public volatile double abbreviationProbability = 0.0001f;</span>
+<span class="nc" id="L57">    public volatile int abbreviationComplexityMin = 20;</span>
+<span class="nc" id="L58">    public volatile double abbreviationQualityMin = 0.95f;</span>
+
+    public void setAbbreviationProbability(double val) {
+<span class="nc" id="L61">        this.abbreviationProbability = val;</span>
+<span class="nc" id="L62">    }</span>
+    public double getAbbreviationProbability() {
+<span class="nc" id="L64">        return abbreviationProbability;</span>
+    }
+    
+    public void setAbbreviationComplexityMin(double val) {
+<span class="nc" id="L68">        this.abbreviationComplexityMin = (int) val;</span>
+<span class="nc" id="L69">    }</span>
+    public double getAbbreviationComplexityMin() {
+<span class="nc" id="L71">        return abbreviationComplexityMin;</span>
+    }
+
+    public void setAbbreviationQualityMin(double val) {
+<span class="nc" id="L75">        this.abbreviationQualityMin = val;</span>
+<span class="nc" id="L76">    }</span>
+    public double getAbbreviationQualityMin() {
+<span class="nc" id="L78">        return abbreviationQualityMin;</span>
+    }
+    
+<span class="nc" id="L81">    public Abbreviation(){}</span>
+<span class="nc" id="L82">    public Abbreviation(double abbreviationProbability, int abbreviationComplexityMin, double abbreviationQualityMin) {</span>
+<span class="nc" id="L83">        this.abbreviationProbability = abbreviationProbability;</span>
+<span class="nc" id="L84">        this.abbreviationComplexityMin = abbreviationComplexityMin;</span>
+<span class="nc" id="L85">        this.abbreviationQualityMin = abbreviationQualityMin;</span>
+<span class="nc" id="L86">    }</span>
+
+    public boolean canAbbreviate(final Task task) {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        return !(task.sentence.term instanceof Operation) &amp;&amp; </span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                (task.sentence.term.getComplexity() &gt; abbreviationComplexityMin) &amp;&amp;</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                (task.budget.getQuality() &gt; abbreviationQualityMin);</span>
+    }
+    
+    @Override
+    public boolean setEnabled(final Nar n, final boolean enabled) {
+<span class="nc" id="L96">        final Memory memory = n.memory;</span>
+        
+<span class="nc" id="L98">        Operator _abbreviate = memory.getOperator(&quot;^abbreviate&quot;);</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (_abbreviate == null) {</span>
+<span class="nc" id="L100">            _abbreviate = memory.addOperator(new Abbreviate());</span>
+        }
+<span class="nc" id="L102">        final Operator abbreviate = _abbreviate;</span>
+        
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if(obs==null) {</span>
+<span class="nc" id="L105">            obs= (event, a) -&gt; {</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                if (event != TaskDerive.class)</span>
+<span class="nc" id="L107">                    return;</span>
+
+<span class="nc bnc" id="L109" title="All 4 branches missed.">                if ((abbreviationProbability &lt; 1.0) &amp;&amp; (n.memory.randomNumber.nextDouble() &gt;= abbreviationProbability))</span>
+<span class="nc" id="L110">                    return;</span>
+
+<span class="nc" id="L112">                final Task task = (Task)a[0];</span>
+
+                //is it complex and also important? then give it a name:
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                if (canAbbreviate(task)) {</span>
+
+<span class="nc" id="L117">                    final Operation operation = Operation.make(</span>
+<span class="nc" id="L118">                            abbreviate, termArray(task.sentence.term ),</span>
+                            false);
+
+<span class="nc" id="L121">                    operation.setTask(task);</span>
+
+<span class="nc" id="L123">                    abbreviate.call(operation, memory, n);</span>
+                }
+
+<span class="nc" id="L126">            };</span>
+        }
+        
+<span class="nc" id="L129">        memory.event.set(obs, enabled, TaskDerive.class);</span>
+        
+<span class="nc" id="L131">        return true;</span>
+    }
+
+
+    /**
+     * Operator that give a CompoundTerm an atomic name
+     */
+    public static class Abbreviate extends Operator {
+
+        public Abbreviate() {
+<span class="nc" id="L141">            super(&quot;^abbreviate&quot;);</span>
+<span class="nc" id="L142">        }</span>
+
+<span class="nc" id="L144">        private static Integer currentTermSerial = 1;</span>
+        public Term newSerialTerm(final char prefix) {
+<span class="nc" id="L146">            synchronized(currentTermSerial) {</span>
+<span class="nc" id="L147">                currentTermSerial++;</span>
+<span class="nc" id="L148">            }</span>
+<span class="nc" id="L149">            return new Term(prefix + String.valueOf(currentTermSerial));</span>
+        }
+
+
+        /**
+         * To create a judgment with a given statement
+         * @param args Arguments, a Statement followed by an optional tense
+         * @param memory The memory in which the operation is executed
+         * @return Immediate results as Tasks
+         */
+        @Override
+        protected List&lt;Task&gt; execute(final Operation operation, final Term[] args, final Memory memory, final Timable time) {
+
+<span class="nc" id="L162">            final Term compound = args[0];</span>
+
+<span class="nc" id="L164">            final Term atomic = newSerialTerm(Symbols.TERM_PREFIX);</span>
+
+<span class="nc" id="L166">            final Sentence sentence = new Sentence(</span>
+<span class="nc" id="L167">                Similarity.make(compound, atomic),</span>
+                Symbols.JUDGMENT_MARK,
+                new TruthValue(1, memory.narParameters.DEFAULT_JUDGMENT_CONFIDENCE, memory.narParameters),  // a naming convension
+                new Stamp(time, memory));
+
+<span class="nc" id="L172">            final float quality = BudgetFunctions.truthToQuality(sentence.truth);</span>
+
+<span class="nc" id="L174">            final BudgetValue budget = new BudgetValue(</span>
+                memory.narParameters.DEFAULT_JUDGMENT_PRIORITY,
+                memory.narParameters.DEFAULT_JUDGMENT_DURABILITY,
+                quality, memory.narParameters);
+
+<span class="nc" id="L179">            final Task newTask = new Task(sentence, budget, Task.EnumType.INPUT);</span>
+<span class="nc" id="L180">            return Lists.newArrayList(newTask);</span>
+
+        }
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

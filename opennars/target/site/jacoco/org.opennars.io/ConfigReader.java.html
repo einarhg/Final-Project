@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConfigReader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.io</a> &gt; <span class="el_source">ConfigReader.java</span></div><h1>ConfigReader.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.io;
+
+import com.google.common.io.Resources;
+import org.opennars.interfaces.pub.Reasoner;
+import org.opennars.main.Parameters;
+import org.opennars.main.Debug;
+import org.opennars.plugin.Plugin;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ * Used to read and parse the XML configuration file
+ *
+ * @author Robert Wünsche
+ */
+<span class="nc" id="L62">public class ConfigReader {</span>
+
+    public static List&lt;Plugin&gt; loadParamsFromFileAndReturnPlugins(final String filepath, final Reasoner reasoner, final Parameters parameters) throws IOException, IllegalAccessException, ParseException, ParserConfigurationException, SAXException, ClassNotFoundException, NoSuchMethodException, InstantiationException, InvocationTargetException {
+        
+<span class="fc" id="L66">        System.out.println(&quot;Got relative path for loading the config: &quot; + filepath);</span>
+<span class="fc" id="L67">        List&lt;Plugin&gt; ret = new ArrayList&lt;Plugin&gt;();</span>
+<span class="fc" id="L68">        File file = new File(filepath);</span>
+
+<span class="fc" id="L70">        InputStream stream = null;</span>
+        // if this failed, then load from resources
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if(!file.exists()) {</span>
+<span class="fc" id="L73">            file = null;</span>
+<span class="fc" id="L74">            URL n = Resources.getResource(&quot;config/defaultConfig.xml&quot;);</span>
+            //System.out.println(n.toURI().toString());
+<span class="fc" id="L76">            URLConnection connection = n.openConnection();</span>
+<span class="fc" id="L77">            stream = connection.getInputStream();</span>
+<span class="fc" id="L78">            System.out.println(&quot;Loading config &quot; + &quot;config/defaultConfig.xml&quot; +&quot; from resources&quot;);</span>
+<span class="fc" id="L79">        } else {</span>
+<span class="nc" id="L80">            System.out.println(&quot;Loading config &quot; + file.getName() +&quot; from file&quot;);</span>
+        }
+        
+<span class="fc" id="L83">        final DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();</span>
+<span class="fc" id="L84">        final DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        final Document document = stream != null ? documentBuilder.parse(stream) : documentBuilder.parse(file);</span>
+<span class="fc" id="L86">        final NodeList config = document.getElementsByTagName(&quot;config&quot;).item(0).getChildNodes();</span>
+
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (int iterationConfigIdx = 0; iterationConfigIdx &lt; config.getLength(); iterationConfigIdx++) {</span>
+<span class="fc" id="L89">            final Node iConfig = config.item(iterationConfigIdx);</span>
+
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            if (iConfig.getNodeType() != Node.ELEMENT_NODE) {</span>
+<span class="fc" id="L92">                continue;</span>
+            }
+
+<span class="fc" id="L95">            final String nodeName = iConfig.getNodeName();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if( nodeName.equals(&quot;plugins&quot;) ) {</span>
+<span class="fc" id="L97">                final NodeList plugins = iConfig.getChildNodes();</span>
+
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                for (int iterationPluginIdx = 0; iterationPluginIdx &lt; plugins.getLength(); iterationPluginIdx++) {</span>
+<span class="fc" id="L100">                    final Node iPlugin = plugins.item(iterationPluginIdx);</span>
+
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                    if (iPlugin.getNodeType() != Node.ELEMENT_NODE) {</span>
+<span class="fc" id="L103">                        continue;</span>
+                    }
+
+<span class="fc" id="L106">                    final String pluginClassPath = iPlugin.getAttributes().getNamedItem(&quot;classpath&quot;).getNodeValue();</span>
+
+<span class="fc" id="L108">                    final NodeList arguments = iPlugin.getChildNodes();</span>
+
+<span class="fc" id="L110">                    Plugin createdPlugin = createPluginByClassnameAndArguments(pluginClassPath, arguments, reasoner);</span>
+<span class="fc" id="L111">                    ret.add(createdPlugin);</span>
+                }
+<span class="fc" id="L113">            }</span>
+            else {
+
+<span class="fc" id="L116">                final String propertyName = iConfig.getAttributes().getNamedItem(&quot;name&quot;).getNodeValue();</span>
+<span class="fc" id="L117">                final String propertyValueAsString = iConfig.getAttributes().getNamedItem(&quot;value&quot;).getNodeValue();</span>
+
+<span class="fc" id="L119">                boolean wasConfigValueAssigned = false;</span>
+
+                try {
+<span class="fc" id="L122">                    final Field fieldOfProperty = Parameters.class.getField(propertyName);</span>
+
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                    if (fieldOfProperty.getType() == int.class) {</span>
+<span class="fc" id="L125">                        fieldOfProperty.set(parameters, Integer.parseInt(propertyValueAsString));</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                    } else if (fieldOfProperty.getType() == float.class) {</span>
+<span class="fc" id="L127">                        fieldOfProperty.set(parameters, Float.parseFloat(propertyValueAsString));</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                    } else if (fieldOfProperty.getType() == double.class) {</span>
+<span class="fc" id="L129">                        fieldOfProperty.set(parameters, Double.parseDouble(propertyValueAsString));</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                    } else if (fieldOfProperty.getType() == boolean.class) {</span>
+<span class="fc" id="L131">                        fieldOfProperty.set(parameters, Boolean.parseBoolean(propertyValueAsString));</span>
+                    } else {
+<span class="nc" id="L133">                        throw new ParseException(&quot;Unknown type&quot;, 0);</span>
+                    }
+
+<span class="fc" id="L136">                    wasConfigValueAssigned = true;</span>
+<span class="nc" id="L137">                } catch (NoSuchFieldException e) {</span>
+<span class="nc" id="L138">                    System.out.println(propertyName + &quot; is not a valid NARS config field&quot;);</span>
+<span class="fc" id="L139">                }</span>
+
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">                if (!wasConfigValueAssigned) {</span>
+                    try {
+<span class="nc" id="L143">                        final Field fieldOfProperty = Debug.class.getDeclaredField(propertyName);</span>
+
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                        if (fieldOfProperty.getType() == int.class) {</span>
+<span class="nc" id="L146">                            fieldOfProperty.set(null, Integer.parseInt(propertyValueAsString));</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">                        } else if (fieldOfProperty.getType() == float.class) {</span>
+<span class="nc" id="L148">                            fieldOfProperty.set(null, Float.parseFloat(propertyValueAsString));</span>
+                        } else {
+<span class="nc" id="L150">                            throw new ParseException(&quot;Unknown type&quot;, 0);</span>
+                        }
+
+<span class="nc" id="L153">                        wasConfigValueAssigned = true;</span>
+<span class="nc" id="L154">                    } catch (NoSuchFieldException e) {</span>
+                        // ignore
+<span class="nc" id="L156">                    }</span>
+                }
+            }
+        }
+<span class="fc" id="L160">        return ret;</span>
+    }
+
+    private static Plugin createPluginByClassnameAndArguments(String pluginClassPath, NodeList arguments, Reasoner reasoner) throws ParseException, ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
+<span class="fc" id="L164">        List&lt;Class&gt; types = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L165">        List&lt;Object&gt; values = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (int parameterIdx = 0; parameterIdx &lt; arguments.getLength(); parameterIdx++) {</span>
+<span class="fc" id="L168">            final Node iParameter = arguments.item(parameterIdx);</span>
+
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (iParameter.getNodeType() != Node.ELEMENT_NODE) {</span>
+<span class="fc" id="L171">                continue;</span>
+            }
+
+<span class="fc" id="L174">            String typeString = null;</span>
+<span class="fc" id="L175">            String valueString = null;</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            final boolean specialIsReasoner = iParameter.getAttributes().getNamedItem(&quot;isReasoner&quot;) != null;</span>
+
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            if (!specialIsReasoner) {</span>
+<span class="fc" id="L179">                typeString = iParameter.getAttributes().getNamedItem(&quot;type&quot;).getNodeValue();</span>
+<span class="fc" id="L180">                valueString = iParameter.getAttributes().getNamedItem(&quot;value&quot;).getNodeValue();</span>
+            }
+
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (specialIsReasoner) {</span>
+<span class="fc" id="L184">                types.add(Reasoner.class);</span>
+<span class="fc" id="L185">                values.add(reasoner);</span>
+            }
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            else if (typeString.equals(&quot;int.class&quot;)) {</span>
+<span class="fc" id="L188">                types.add(int.class);</span>
+<span class="fc" id="L189">                values.add(Integer.parseInt(valueString));</span>
+            }
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            else if (typeString.equals(&quot;float.class&quot;)) {</span>
+<span class="fc" id="L192">                types.add(float.class);</span>
+<span class="fc" id="L193">                values.add(Float.parseFloat(valueString));</span>
+            }
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            else if (typeString.equals(&quot;boolean.class&quot;)) {</span>
+<span class="fc" id="L196">                types.add(boolean.class);</span>
+<span class="fc" id="L197">                values.add(Boolean.parseBoolean(valueString));</span>
+            }
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            else if (typeString.equals(&quot;String.class&quot;)) {</span>
+<span class="fc" id="L200">                types.add(java.lang.String.class);</span>
+<span class="fc" id="L201">                values.add(valueString);</span>
+            }
+            else {
+<span class="nc" id="L204">                throw new ParseException(&quot;Unknown type&quot;, 0);</span>
+            }
+        }
+
+<span class="fc" id="L208">        Class[] typesAsArr = types.toArray(new Class[types.size()]);</span>
+<span class="fc" id="L209">        Object[] valuesAsArr = values.toArray(new Object[values.size()]);</span>
+
+<span class="fc" id="L211">        Class c = Class.forName(pluginClassPath);</span>
+
+<span class="fc" id="L213">        Plugin createdPlugin = (Plugin)c.getConstructor(typesAsArr).newInstance(valuesAsArr);</span>
+<span class="fc" id="L214">        return createdPlugin;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

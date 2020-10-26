@@ -1,0 +1,403 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Conjunction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.language</a> &gt; <span class="el_source">Conjunction.java</span></div><h1>Conjunction.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.language;
+
+import org.opennars.inference.TemporalRules;
+import org.opennars.io.Symbols.NativeOperator;
+import org.opennars.main.Debug;
+
+import java.util.*;
+
+import static java.lang.System.arraycopy;
+
+/**
+ * Conjunction of statements as defined in the NARS-theory
+ *
+ * @author Pei Wang
+ * @author Patrick Hammer
+ */
+public class Conjunction extends CompoundTerm {
+
+    public final int temporalOrder;
+    public final boolean isSpatial;
+
+    /**
+     * Constructor with partial values, called by make
+     *
+     * @param arg The component list of the term
+     * @param order
+     * @param normalized
+     */
+    //avoids re-calculates of conv rectangle
+    protected Conjunction(final Term[] arg, final int order, final boolean normalized, final boolean spatial, final CompoundTerm.ConvRectangle rect) {
+<span class="fc" id="L54">        super(arg);</span>
+<span class="fc" id="L55">        this.isSpatial = spatial;</span>
+<span class="fc" id="L56">        temporalOrder = order;</span>
+<span class="fc" id="L57">        this.index_variable = rect.index_variable;</span>
+<span class="fc" id="L58">        this.term_indices = rect.term_indices;</span>
+<span class="fc" id="L59">        init(this.term);</span>
+<span class="fc" id="L60">    }</span>
+    protected Conjunction(final Term[] arg, final int order, final boolean normalized, final boolean spatial) {
+<span class="fc" id="L62">        super(arg);</span>
+<span class="fc" id="L63">        this.isSpatial = spatial;</span>
+<span class="fc" id="L64">        temporalOrder = order;</span>
+<span class="fc" id="L65">        init(this.term);</span>
+        //update imagination space if it exists (also type checking the operations):
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if(arg[0].imagination != null) {</span>
+<span class="nc" id="L68">            this.imagination=arg[0].imagination.ConstructSpace(this);</span>
+        }
+<span class="fc" id="L70">    }</span>
+
+    @Override public Term clone(final Term[] t) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if(t == null) {</span>
+<span class="nc" id="L74">            return null;</span>
+        }
+<span class="fc" id="L76">        return make(t, temporalOrder, isSpatial);</span>
+    }
+
+    /**
+     * Clone an object
+     *
+     * @return A new object
+     */
+    @Override
+    public Conjunction clone() {
+<span class="fc" id="L86">        return new Conjunction(term, temporalOrder, isNormalized(), isSpatial);</span>
+    }
+    
+    
+    /**
+     * Get the operator of the term.
+     *
+     * @return the operator of the term
+     */
+    @Override
+    public NativeOperator operator() {
+<span class="fc bfc" id="L97" title="All 3 branches covered.">        switch (temporalOrder) {</span>
+            case TemporalRules.ORDER_FORWARD:
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                if(isSpatial) {</span>
+<span class="fc" id="L100">                    return NativeOperator.SPATIAL;</span>
+                } else {
+<span class="fc" id="L102">                    return NativeOperator.SEQUENCE;</span>
+                }
+            case TemporalRules.ORDER_CONCURRENT:
+<span class="fc" id="L105">                return NativeOperator.PARALLEL;</span>
+            default:
+<span class="fc" id="L107">                return NativeOperator.CONJUNCTION;</span>
+        }
+    }
+
+    /**
+     * Check if the compound is commutative.
+     *
+     * @return true for commutative
+     */
+    @Override
+    public boolean isCommutative() {
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        return temporalOrder != TemporalRules.ORDER_FORWARD;</span>
+    }
+
+    /**
+     * Try to make a new compound from a list of term. Called by StringParser.
+     *
+     * @return the Term generated from the arguments
+     * @param argList the list of arguments
+     */
+    final public static Term make(final Term[] argList) {
+<span class="fc" id="L128">        return make(argList, TemporalRules.ORDER_NONE);</span>
+    }
+
+    public static boolean isConjunctionAndHasSameOrder(final Term t, final int order) {
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if(t instanceof Conjunction) {</span>
+<span class="fc" id="L133">            final Conjunction c=(Conjunction) t;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            return c.getTemporalOrder() == order;</span>
+        }
+<span class="fc" id="L136">        return false;</span>
+    }
+    
+    public static Term[] flatten(final Term[] args, final int order, final boolean isSpatial) { //flatten only same order!
+        //determine how many there are with same order
+<span class="fc" id="L141">        int sz=0;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (final Term a : args) {</span>
+<span class="pc bpc" id="L143" title="1 of 4 branches missed.">            if (isConjunctionAndHasSameOrder(a, order) &amp;&amp; isSpatial == ((Conjunction) a).isSpatial) {</span>
+<span class="fc" id="L144">                sz += ((Conjunction) a).term.length;</span>
+            } else {
+<span class="fc" id="L146">                sz += 1;</span>
+            }
+        }
+<span class="fc" id="L149">        final Term[] ret=new Term[sz];</span>
+<span class="fc" id="L150">        int k=0;</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (final Term a : args) {</span>
+<span class="pc bpc" id="L152" title="1 of 4 branches missed.">            if (isConjunctionAndHasSameOrder(a, order) &amp;&amp; isSpatial == ((Conjunction) a).isSpatial) {</span>
+<span class="fc" id="L153">                final Conjunction c = ((Conjunction) a);</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                for (final Term t : c.term) {</span>
+<span class="fc" id="L155">                    ret[k] = t;</span>
+<span class="fc" id="L156">                    k++;</span>
+                }
+<span class="fc" id="L158">            } else {</span>
+<span class="fc" id="L159">                ret[k] = a;</span>
+<span class="fc" id="L160">                k++;</span>
+            }
+        }
+<span class="fc" id="L163">        return ret;</span>
+    }
+    
+    public static String PositiveIntString(final int value) {
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if(value == 0) {</span>
+<span class="nc" id="L168">            return &quot;&quot;;</span>
+        } else {
+<span class="nc" id="L170">            return &quot;+&quot;+String.valueOf(value);</span>
+        }
+    }
+    public static Term UpdateRelativeIndices(final int minX, final int minY, final int minsX, final int minsY, final Term term) {
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if(term instanceof CompoundTerm) {</span>
+<span class="nc" id="L175">            final CompoundTerm ct = ((CompoundTerm)term);</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            for(int i=0;i&lt;ct.term.length;i++) {</span>
+<span class="nc" id="L177">                ct.term[i]=UpdateRelativeIndices(minX, minY, minsX, minsY, ct.term[i]);</span>
+            }
+<span class="nc" id="L179">            return ct;</span>
+        } else {
+<span class="nc bnc" id="L181" title="All 2 branches missed.">            if(term.term_indices != null) {</span>
+                //term indices remain the same, but representation changes
+<span class="nc" id="L183">                String s = term.index_variable;</span>
+<span class="nc" id="L184">                final int relativeSizeX = term.term_indices[0]-minsX;</span>
+<span class="nc" id="L185">                final int relativeSizeY = term.term_indices[1]-minsY;</span>
+<span class="nc" id="L186">                final int relativePositionX = term.term_indices[2]-minX;</span>
+<span class="nc" id="L187">                final int relativePositionY = term.term_indices[3]-minY;</span>
+                
+<span class="nc" id="L189">                s+=&quot;[i&quot; + PositiveIntString(relativeSizeX)+</span>
+<span class="nc" id="L190">                   &quot;,j&quot; + PositiveIntString(relativeSizeY);</span>
+<span class="nc" id="L191">                s+=&quot;,k&quot; + PositiveIntString(relativePositionX);</span>
+<span class="nc" id="L192">                s+=&quot;,l&quot; + PositiveIntString(relativePositionY)+&quot;]&quot;;</span>
+<span class="nc" id="L193">                final Term ret = Term.get(s);</span>
+<span class="nc" id="L194">                ret.term_indices = term.term_indices;</span>
+<span class="nc" id="L195">                ret.index_variable = term.index_variable;</span>
+<span class="nc" id="L196">                return ret;</span>
+            } else {
+<span class="nc" id="L198">                return term; //another atomic term</span>
+            }
+        }
+    }
+    
+    /**
+     * @param components The components
+     * @return The components sequence with summed intervals
+     * for transforming (&amp;amp;/,a,+1,+1) to (&amp;amp;/,a,+2)
+     */
+    public static Term[] simplifyIntervals(Term[] components) {
+<span class="fc" id="L209">        List&lt;Term&gt; ret = new ArrayList&lt;Term&gt;();</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        for(int i=0;i&lt;components.length;) {</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            if(components[i] instanceof Interval) {</span>
+                // add up next ones
+<span class="fc" id="L213">                long ival = 0;</span>
+<span class="fc bfc" id="L214" title="All 4 branches covered.">                for(;i&lt;components.length &amp;&amp; components[i] instanceof Interval; i++) {</span>
+<span class="fc" id="L215">                    ival += ((Interval)components[i]).time;</span>
+                }
+<span class="fc" id="L217">                ret.add(new Interval(ival));</span>
+<span class="fc" id="L218">            }</span>
+            else {
+<span class="fc" id="L220">                ret.add(components[i]);</span>
+<span class="fc" id="L221">                i++;</span>
+            }
+        }
+<span class="fc" id="L224">        return ret.toArray(new Term[0]);</span>
+    }
+    
+    /**
+     * Try to make a new compound from a list of term. Called by StringParser.
+     *
+     * @param temporalOrder The temporal order among term
+     * @param argList the list of arguments
+     * @return the Term generated from the arguments, or null if not possible
+     */
+    final public static Term make(final Term[] argList, final int temporalOrder) {
+<span class="fc" id="L235">        return make(argList, temporalOrder, false);</span>
+    }
+    final public static Term make(final Term[] argList, final int temporalOrder, final boolean spatial) {
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        if (Debug.DETAILED) {  Terms.verifyNonNull(argList);}</span>
+        
+<span class="pc bpc" id="L240" title="2 of 4 branches missed.">        if (argList == null || argList.length == 0) {</span>
+<span class="nc" id="L241">            return null;</span>
+        }                         // special case: single component
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (argList.length == 1) {</span>
+<span class="fc" id="L244">            return argList[0];</span>
+        }                         // special case: single component
+        
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (temporalOrder == TemporalRules.ORDER_FORWARD) {</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            final Term[] newArgList = spatial ? argList : simplifyIntervals(flatten(argList, temporalOrder, spatial));</span>
+            
+<span class="fc bfc" id="L250" title="All 2 branches covered.">            if(newArgList.length == 1) {</span>
+<span class="fc" id="L251">                return newArgList[0];</span>
+            }
+<span class="fc" id="L253">            return new Conjunction(newArgList, temporalOrder, false, spatial);</span>
+            
+        } 
+        else {
+            
+            // sort/merge arguments
+<span class="fc" id="L259">            final NavigableSet&lt;Term&gt; set = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L260">            final Term[] flattened = flatten(argList, temporalOrder, spatial);</span>
+<span class="fc" id="L261">            final ConvRectangle rect = UpdateConvRectangle(flattened);</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">            for (final Term t : flattened) {</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">                if(!(t instanceof Interval)) { //intervals only for seqs</span>
+<span class="pc bpc" id="L264" title="5 of 6 branches missed.">                    if(t.term_indices == null || rect == null || rect.term_indices == null) {</span>
+<span class="fc" id="L265">                        set.add(t);</span>
+                    } 
+                    else 
+<span class="nc bnc" id="L268" title="All 2 branches missed.">                    if(t instanceof CompoundTerm)</span>
+                    {   
+<span class="nc" id="L270">                        final Term updated = UpdateRelativeIndices(rect.term_indices[2], rect.term_indices[3], rect.term_indices[4], rect.term_indices[5], t.cloneDeep());</span>
+<span class="nc" id="L271">                        set.add(updated);</span>
+                    }
+                }
+            }
+            
+<span class="fc bfc" id="L276" title="All 2 branches covered.">            if (set.size() == 1) {</span>
+<span class="fc" id="L277">                return set.first();</span>
+            }
+            
+<span class="fc" id="L280">            return new Conjunction(set.toArray(new Term[0]), temporalOrder, false, spatial, rect);</span>
+        }
+    }
+
+    final public static Term make(final Term prefix, final Interval suffix, final int temporalOrder) {
+<span class="fc" id="L285">        final Term[] t = new Term[1+1];</span>
+<span class="fc" id="L286">        int i = 0;</span>
+<span class="fc" id="L287">        t[i++] = prefix;</span>
+<span class="fc" id="L288">        t[i++] = suffix;</span>
+<span class="fc" id="L289">        return make(t, temporalOrder);        </span>
+    }
+    
+    final public static Term make(final Term prefix, final Interval ival, final Term suffix, final int temporalOrder) {
+<span class="fc" id="L293">        final Term[] t = new Term[1+2];</span>
+<span class="fc" id="L294">        int i = 0;</span>
+<span class="fc" id="L295">        t[i++] = prefix;</span>
+<span class="fc" id="L296">        t[i++] = ival;</span>
+<span class="fc" id="L297">        t[i++] = suffix;</span>
+<span class="fc" id="L298">        return make(t, temporalOrder);        </span>
+    }
+    
+    /**    
+     *
+     * @param set a set of Term as term
+     * @return the Term generated from the arguments
+     */
+    final private static Term make(final Collection&lt;Term&gt; set, final int temporalOrder, final boolean spatial) {
+<span class="fc" id="L307">        final Term[] argument = set.toArray(new Term[0]);</span>
+<span class="fc" id="L308">        return make(argument, temporalOrder, spatial);</span>
+    }
+
+    @Override
+    protected CharSequence makeName() {
+<span class="fc" id="L313">        return makeCompoundName( operator(),  term);</span>
+    }
+
+    
+    // overload this method by term type?
+    /**
+     * Try to make a new compound from two term. Called by the inference rules.
+     *
+     * @param term1 The first component
+     * @param term2 The second component
+     * @return A compound generated or a term it reduced to
+     */
+    final public static Term make(final Term term1, final Term term2) {
+<span class="fc" id="L326">        return make(term1, term2, TemporalRules.ORDER_NONE);</span>
+    }
+
+    final public static Term make(final Term term1, final Term term2, final int temporalOrder) {
+<span class="fc" id="L330">        return make(term1, term2, temporalOrder, false);</span>
+    }
+    final public static Term make(final Term term1, final Term term2, final int temporalOrder, final boolean spatial) {
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        if (temporalOrder == TemporalRules.ORDER_FORWARD) {</span>
+            
+            final Term[] components;
+            
+<span class="pc bpc" id="L337" title="2 of 4 branches missed.">            if ((term1 instanceof Conjunction) &amp;&amp; (term1.getTemporalOrder() == TemporalRules.ORDER_FORWARD)) {</span>
+                
+<span class="fc" id="L339">                final CompoundTerm cterm1 = (CompoundTerm) term1;</span>
+                
+<span class="fc" id="L341">                final List&lt;Term&gt; list = new ArrayList&lt;&gt;(cterm1.size());</span>
+<span class="fc" id="L342">                cterm1.addTermsTo(list);</span>
+                        
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">                if ((term2 instanceof Conjunction) &amp;&amp; </span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">                        cterm1.getIsSpatial() == term2.getIsSpatial() &amp;&amp;</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">                        term2.getTemporalOrder() == TemporalRules.ORDER_FORWARD) { </span>
+                    // (&amp;/,(&amp;/,P,Q),(&amp;/,R,S)) = (&amp;/,P,Q,R,S)
+<span class="nc" id="L348">                    ((CompoundTerm) term2).addTermsTo(list);</span>
+                } 
+                else {
+                    // (&amp;,(&amp;,P,Q),R) = (&amp;,P,Q,R)
+<span class="fc" id="L352">                    list.add(term2);</span>
+                }
+                
+<span class="fc" id="L355">                components = list.toArray(new Term[0]);</span>
+                
+<span class="pc bnc" id="L357" title="All 4 branches missed.">            } else if ((term2 instanceof Conjunction) &amp;&amp; (term2.getTemporalOrder() == TemporalRules.ORDER_FORWARD)) {</span>
+<span class="nc" id="L358">                final CompoundTerm cterm2 = (CompoundTerm) term2;</span>
+<span class="nc" id="L359">                components = new Term[((CompoundTerm) term2).size() + 1];</span>
+<span class="nc" id="L360">                components[0] = term1;</span>
+<span class="nc" id="L361">                arraycopy(cterm2.term, 0, components, 1, cterm2.size());</span>
+<span class="nc" id="L362">            } else {</span>
+<span class="nc" id="L363">                components = new Term[] { term1, term2 };</span>
+            }
+<span class="fc" id="L365">            return make(components, temporalOrder, spatial);</span>
+            
+        } else {
+            
+<span class="fc" id="L369">            final List&lt;Term&gt; set = new ArrayList();</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">            if (term1 instanceof Conjunction) {                </span>
+<span class="fc" id="L371">                ((CompoundTerm) term1).addTermsTo(set);</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">                if (term2 instanceof Conjunction) {                    </span>
+                    // (&amp;,(&amp;,P,Q),(&amp;,R,S)) = (&amp;,P,Q,R,S)
+<span class="fc" id="L374">                    ((CompoundTerm) term2).addTermsTo(set);</span>
+                } 
+                else {
+                    // (&amp;,(&amp;,P,Q),R) = (&amp;,P,Q,R)
+<span class="fc" id="L378">                    set.add(term2);</span>
+                }                          
+                
+<span class="fc bfc" id="L381" title="All 2 branches covered.">            } else if (term2 instanceof Conjunction) {</span>
+<span class="fc" id="L382">                ((CompoundTerm) term2).addTermsTo(set);</span>
+<span class="fc" id="L383">                set.add(term1);                              // (&amp;,R,(&amp;,P,Q)) = (&amp;,P,Q,R)</span>
+            } else {                
+<span class="fc" id="L385">                set.add(term1);</span>
+<span class="fc" id="L386">                set.add(term2);</span>
+            }
+            
+<span class="fc" id="L389">            return make(set, temporalOrder, spatial);</span>
+        }
+    }
+
+    @Override
+    public int getTemporalOrder() {
+<span class="fc" id="L395">        return temporalOrder;</span>
+    }
+    
+    @Override
+    public boolean getIsSpatial() {
+<span class="fc" id="L400">        return isSpatial;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

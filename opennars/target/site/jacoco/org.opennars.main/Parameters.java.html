@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Parameters.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.main</a> &gt; <span class="el_source">Parameters.java</span></div><h1>Parameters.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.main;
+
+import java.io.Serializable;
+
+/**
+ * Reasoner local settings and deriver options
+ *
+ * @author Patrick Hammer
+ */
+// TODO&lt; rename this after MVP0 to &quot;ReasonerArguments&quot; &gt;
+<span class="fc" id="L34">public class Parameters implements Serializable {</span>
+    /** what this value represents was originally equal to the termlink record length (10), but we may want to adjust it or make it scaled according to duration since it has more to do with time than # of records.  it can probably be increased several times larger since each item should remain in the recording queue for longer than 1 cycle */
+<span class="fc" id="L36">    public volatile int NOVELTY_HORIZON = 100000;</span>
+
+    /** Minimum expectation for a desire value to execute an operation.
+     *  the range of &quot;now&quot; is [-DURATION, DURATION]; */
+<span class="fc" id="L40">    public volatile float DECISION_THRESHOLD = 0.51f;</span>
+
+    /** Size of ConceptBag and level amount */
+    //not changeable at runtime as bags would have to be re-constructed
+<span class="fc" id="L44">    public int CONCEPT_BAG_SIZE = 10000;</span>
+<span class="fc" id="L45">    public int CONCEPT_BAG_LEVELS = 1000;</span>
+    
+    /** 
+       Cycles per duration.
+       Past/future tense usage convention;
+       How far away &quot;past&quot; and &quot;future&quot; is from &quot;now&quot;, in cycles.         
+       The range of &quot;now&quot; is [-DURATION/2, +DURATION/2];      */
+    
+<span class="fc" id="L53">    public volatile int DURATION = 5;</span>
+
+    /* ---------- logical parameters ---------- */
+    /** Evidential Horizon, the amount of future evidence to be considered.
+     * Must be &amp;gt;=1.0, usually 1 .. 2, not changeable at runtime as evidence measurement would change
+     */
+<span class="fc" id="L59">    public float HORIZON = 1;</span>
+
+    /** determines the internal precision used for TruthValue calculations.
+     *  a value of 0.01 gives 100 truth value states between 0 and 1.0.
+     *  other values may be used, for example, 0.02 for 50, 0.10 for 10, etc.
+     *  Change at your own risk, but can't be changed at runtime
+     */
+<span class="fc" id="L66">    public float TRUTH_EPSILON = 0.01f;</span>
+
+<span class="fc" id="L68">    public float BUDGET_EPSILON = 0.0001f;</span>
+
+    /* ---------- budget thresholds ---------- */
+    /** The budget threshold rate for task to be accepted. */
+<span class="fc" id="L72">    public volatile float BUDGET_THRESHOLD = (float) 0.01;</span>
+
+    /* ---------- default input values ---------- */
+    /** Default expectation for confirmation on anticipation. */
+<span class="fc" id="L76">    public volatile float DEFAULT_CONFIRMATION_EXPECTATION = (float) 0.6;</span>
+    /** Ignore expectation for creation of concept. */
+<span class="fc" id="L78">    public volatile boolean ALWAYS_CREATE_CONCEPT = true;</span>
+    /** Default expectation for creation of concept. */
+<span class="fc" id="L80">    public volatile float DEFAULT_CREATION_EXPECTATION = (float) 0.66; //0.66</span>
+    /** Default expectation for creation of concept for goals. */
+<span class="fc" id="L82">    public volatile float DEFAULT_CREATION_EXPECTATION_GOAL = (float) 0.6; //0.66</span>
+    /** Default confidence of input judgment. */
+<span class="fc" id="L84">    public volatile float DEFAULT_JUDGMENT_CONFIDENCE = (float) 0.9;</span>
+    /** Default priority of input judgment */
+<span class="fc" id="L86">    public volatile float DEFAULT_JUDGMENT_PRIORITY = (float) 0.8;</span>
+    /** Default durability of input judgment */
+<span class="fc" id="L88">    public volatile float DEFAULT_JUDGMENT_DURABILITY = (float) 0.5; //was 0.8 in 1.5.5; 0.5 after</span>
+    /** Default priority of input question */
+<span class="fc" id="L90">    public volatile float DEFAULT_QUESTION_PRIORITY = (float) 0.9;</span>
+    /** Default durability of input question */
+<span class="fc" id="L92">    public volatile float DEFAULT_QUESTION_DURABILITY = (float) 0.9;</span>
+
+
+    /** Default confidence of input goal. */
+<span class="fc" id="L96">    public volatile float DEFAULT_GOAL_CONFIDENCE = (float) 0.9;</span>
+    /** Default priority of input judgment */
+<span class="fc" id="L98">    public volatile float DEFAULT_GOAL_PRIORITY = (float) 0.9;</span>
+    /** Default durability of input judgment */
+<span class="fc" id="L100">    public volatile float DEFAULT_GOAL_DURABILITY = (float) 0.9;</span>
+    /** Default priority of input question */
+<span class="fc" id="L102">    public volatile float DEFAULT_QUEST_PRIORITY = (float) 0.9;</span>
+    /** Default durability of input question */
+<span class="fc" id="L104">    public volatile float DEFAULT_QUEST_DURABILITY = (float) 0.9;</span>
+
+
+    /* ---------- space management ---------- */
+
+    /** Level separation in LevelBag, one digit
+     */
+<span class="fc" id="L111">    public float BAG_THRESHOLD = 1.0f;</span>
+
+    /** (see its use in budgetfunctions iterative forgetting) */
+<span class="fc" id="L114">    public volatile float FORGET_QUALITY_RELATIVE = 0.3f;</span>
+
+<span class="fc" id="L116">    public volatile int REVISION_MAX_OCCURRENCE_DISTANCE = 10;</span>
+
+    /** Size of TaskLinkBag */
+<span class="fc" id="L119">    public int TASK_LINK_BAG_SIZE = 100;  //was 200 in new experiment</span>
+<span class="fc" id="L120">    public int TASK_LINK_BAG_LEVELS = 10;</span>
+    /** Size of TermLinkBag */
+<span class="fc" id="L122">    public int TERM_LINK_BAG_SIZE = 100;  //was 1000 in new experiment</span>
+<span class="fc" id="L123">    public int TERM_LINK_BAG_LEVELS = 10;</span>
+    /** Maximum TermLinks checked for novelty for each TaskLink in TermLinkBag */
+<span class="fc" id="L125">    public volatile int TERM_LINK_MAX_MATCHED = 10;</span>
+    /** Size of Novel Task Buffer */
+<span class="fc" id="L127">    public int NOVEL_TASK_BAG_SIZE = 1000;</span>
+<span class="fc" id="L128">    public int NOVEL_TASK_BAG_LEVELS = 100;</span>
+<span class="fc" id="L129">    public volatile int NOVEL_TASK_BAG_SELECTIONS = 100;</span>
+    /**  Size of derived sequence and input event bag */
+<span class="fc" id="L131">    public int SEQUENCE_BAG_SIZE = 30;</span>
+<span class="fc" id="L132">    public int SEQUENCE_BAG_LEVELS = 10;</span>
+    /**  Size of remembered last operation tasks */
+<span class="fc" id="L134">    public int OPERATION_BAG_SIZE = 10;</span>
+<span class="fc" id="L135">    public int OPERATION_BAG_LEVELS = 10;</span>
+<span class="fc" id="L136">    public volatile int OPERATION_SAMPLES = 6; //should be at least 2 to not only consider last decision</span>
+    
+    /** How fast events decay in confidence **/
+<span class="fc" id="L139">    public volatile double PROJECTION_DECAY = 0.1;</span>
+
+    /* ---------- avoiding repeated reasoning ---------- */
+    /** Maximum length of the evidental base of the Stamp */
+<span class="fc" id="L143">    public int MAXIMUM_EVIDENTAL_BASE_LENGTH = 20000;</span>
+
+    /** Maximum TermLinks used in reasoning for each Task in Concept */
+<span class="fc" id="L146">    public volatile int TERMLINK_MAX_REASONED = 3;</span>
+
+
+    /** Record-length for newly created TermLink's */
+<span class="fc" id="L150">    public int TERM_LINK_RECORD_LENGTH =10;</span>
+
+    /** Maximum number of beliefs kept in a Concept */
+<span class="fc" id="L153">    public int CONCEPT_BELIEFS_MAX = 28; //was 7</span>
+
+    /** Maximum number of questions kept in a Concept */
+<span class="fc" id="L156">    public int CONCEPT_QUESTIONS_MAX = 5;</span>
+
+    /** Maximum number of goals kept in a Concept */
+<span class="fc" id="L159">    public int CONCEPT_GOALS_MAX = 7;</span>
+
+    /** Reliance factor, the empirical confidence of analytical truth.
+     the same as default confidence  */
+<span class="fc" id="L163">    public volatile float reliance = 0.9f;</span>
+
+
+
+    /**
+     * The rate of confidence decrease in mental operations Doubt and Hesitate
+     * set to zero to disable this feature.
+     */
+<span class="fc" id="L171">    public volatile float DISCOUNT_RATE = 0.5f;</span>
+
+    
+
+
+
+
+
+
+    //RUNTIME PERFORMANCE (should not affect logic): ----------------------------------
+
+    /*
+     * max length of a Term name for which it can be storedally via String.intern().
+     * set to zero to disable this feature.
+     * The problem with indiscriminate use of intern() is that interned strings can not be garbage collected (i.e. permgen) - possible a memory leak if terms disappear.
+     */
+    //public int INTERNED_TERM_NAME_MAXLEN = 0;
+
+    /*
+     * Determines when TermLink and TaskLink should use Rope implementation for its Key,
+     * rather than String/StringBuilder.
+     *
+     * Set to -1 to disable the Rope entirely, 0 to use always, or a larger number as a threshold
+     * below which uses contiguous char[] implementation, and above which uses
+     * FastConcatenationRope.
+     *
+     * While a Rope is potentially more memory efficient (because it can re-use String instances
+     * in its components without a redundant copy being stored) it can be more
+     * computationally costly than a character array.
+     *
+     * The value needs to be weighed against the overhead of the comparison and iteration costs.
+     *
+     * Optimal value to be determined.
+     */
+
+    /** whether eternalization should happen on every derivation */
+<span class="fc" id="L207">    public volatile boolean IMMEDIATE_ETERNALIZATION=true;</span>
+
+
+    // public int STM_SIZE = 1;
+<span class="fc" id="L211">    public volatile int SEQUENCE_BAG_ATTEMPTS = 10; //5 //20</span>
+<span class="fc" id="L212">    public volatile int CONDITION_BAG_ATTEMPTS = 10; //5 //20</span>
+
+<span class="fc" id="L214">    public volatile float DERIVATION_PRIORITY_LEAK = 0.4f; //https://groups.google.com/forum/#!topic/open-nars/y0XDrs2dTVs</span>
+
+<span class="fc" id="L216">    public volatile float DERIVATION_DURABILITY_LEAK = 0.4f; //https://groups.google.com/forum/#!topic/open-nars/y0XDrs2dTVs</span>
+
+    /** how much risk is the system allowed to take just to fullfill its hunger for knowledge? */
+<span class="fc" id="L219">    public volatile float CURIOSITY_DESIRE_CONFIDENCE_MUL=0.1f;</span>
+
+    /** how much priority should curiosity have? */
+<span class="fc" id="L222">    public volatile float CURIOSITY_DESIRE_PRIORITY_MUL=0.1f;</span>
+
+    /** how much durability should curiosity have? */
+<span class="fc" id="L225">    public volatile float CURIOSITY_DESIRE_DURABILITY_MUL=0.3f;</span>
+
+
+<span class="fc" id="L228">    public volatile boolean CURIOSITY_FOR_OPERATOR_ONLY=false; //for Peis concern that it may be overkill to allow it for all &amp;lt;a =/&amp;gt; b&amp;gt; statement, so that a has to be an operator</span>
+
+<span class="fc" id="L230">    public volatile boolean BREAK_NAL_HOL_BOUNDARY=false;</span>
+
+<span class="fc" id="L232">    public volatile boolean QUESTION_GENERATION_ON_DECISION_MAKING=false;</span>
+
+<span class="fc" id="L234">    public volatile boolean HOW_QUESTION_GENERATION_ON_DECISION_MAKING=false;</span>
+
+    /** eternalized induction confidence to revise A =/&amp;gt; B beliefs */
+<span class="fc" id="L237">    public volatile float ANTICIPATION_CONFIDENCE = 0.1f;</span>
+
+<span class="fc" id="L239">    public volatile float ANTICIPATION_TOLERANCE = 100.0f;</span>
+    
+    /** Retrospective anticipation, allow to check memory for content in case of anticipation (potential issue with forgetting) */
+<span class="fc" id="L242">    public boolean RETROSPECTIVE_ANTICIPATIONS = false;</span>
+    
+<span class="fc" id="L244">    public volatile float SATISFACTION_TRESHOLD = 0.0f; //decision threshold is enough for now</span>
+    
+<span class="fc" id="L246">    public volatile float COMPLEXITY_UNIT=1.0f; //1.0 - oo</span>
+    
+<span class="fc" id="L248">    public volatile float INTERVAL_ADAPT_SPEED = 4.0f;</span>
+ 
+<span class="fc" id="L250">    public int TASKLINK_PER_CONTENT = 4; //eternal/event are also seen extra</span>
+    
+    /** Default priority of execution feedback */
+<span class="fc" id="L253">    public volatile float DEFAULT_FEEDBACK_PRIORITY = (float) 0.9;</span>
+    /** Default durability of execution feedback */
+<span class="fc" id="L255">    public volatile float DEFAULT_FEEDBACK_DURABILITY = (float) 0.5; //was 0.8 in 1.5.5; 0.5 after</span>
+
+    /** Concept decay rate in ConceptBag, in [1, 99].  originally: CONCEPT_FORGETTING_CYCLE
+     *  How many cycles it takes an item to decay completely to a threshold value (ex: 0.1).
+     *  Lower means faster rate of decay.*/
+<span class="fc" id="L260">    public volatile float CONCEPT_FORGET_DURATIONS = 2.0f;</span>
+
+    /** TermLink decay rate in TermLinkBag, in [1, 99]. originally: TERM_LINK_FORGETTING_CYCLE */
+<span class="fc" id="L263">    public volatile float TERMLINK_FORGET_DURATIONS = 10.0f;</span>
+
+    /** TaskLink decay rate in TaskLinkBag, in [1, 99]. originally: TASK_LINK_FORGETTING_CYCLE */
+<span class="fc" id="L266">    public volatile float TASKLINK_FORGET_DURATIONS = 4.0f;</span>
+
+    /** Sequence bag forget durations */
+<span class="fc" id="L269">    public volatile float EVENT_FORGET_DURATIONS = 4.0f;</span>
+    
+    /** Maximum attempted combinations in variable introduction.*/
+<span class="fc" id="L272">    public volatile int VARIABLE_INTRODUCTION_COMBINATIONS_MAX = 8;</span>
+    
+    /** How much confidence should be penalized per introduced var */
+<span class="fc" id="L275">    public volatile float VARIABLE_INTRODUCTION_CONFIDENCE_MUL = 0.9f;</span>
+    
+    /** Maximum anticipations about its content stored in a concept */
+<span class="fc" id="L278">    public volatile int ANTICIPATIONS_PER_CONCEPT_MAX = 8;</span>
+    
+    /** operations having used procedure knowledge above the confidence threshold will not babble */
+<span class="fc" id="L281">    public volatile float MOTOR_BABBLING_CONFIDENCE_THRESHOLD = 0.8f;</span>
+    
+    /** Default threads amount at startup */
+<span class="fc" id="L284">    public volatile int THREADS_AMOUNT = 1;</span>
+    
+    /** Default volume at startup */
+<span class="fc" id="L287">    public volatile int VOLUME = 0;</span>
+    
+    /** Default miliseconds per step at startup */
+<span class="fc" id="L290">    public volatile int MILLISECONDS_PER_STEP = 0;</span>
+    
+    /** Timing mode, steps or real time */
+<span class="fc" id="L293">    public volatile boolean STEPS_CLOCK = true;</span>
+    
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

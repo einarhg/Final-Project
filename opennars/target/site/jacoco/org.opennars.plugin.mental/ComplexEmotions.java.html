@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComplexEmotions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.plugin.mental</a> &gt; <span class="el_source">ComplexEmotions.java</span></div><h1>ComplexEmotions.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.plugin.mental;
+
+import org.opennars.entity.Concept;
+import org.opennars.entity.Task;
+import org.opennars.io.events.EventEmitter;
+import org.opennars.io.events.Events;
+import org.opennars.io.events.Events.Answer;
+import org.opennars.main.Nar;
+import org.opennars.plugin.Plugin;
+import org.opennars.storage.Memory;
+
+import static org.opennars.inference.LocalRules.solutionQuality;
+
+/**
+ *
+ * @author Patrick
+ */
+<span class="nc" id="L41">public class ComplexEmotions implements Plugin {</span>
+
+    public EventEmitter.EventObserver obs;
+<span class="nc" id="L44">    float fear = 0.5f;</span>
+    @Override
+    public boolean setEnabled(final Nar n, final boolean enabled) {
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if(enabled) {</span>
+            
+<span class="nc" id="L49">            final Memory memory = n.memory;</span>
+        
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            if(obs==null) {</span>
+<span class="nc" id="L52">                obs= (event, a) -&gt; {</span>
+<span class="nc bnc" id="L53" title="All 4 branches missed.">                    if (event != Events.TaskDerive.class &amp;&amp;</span>
+                            event != Events.InduceSucceedingEvent.class)
+<span class="nc" id="L55">                        return;</span>
+<span class="nc" id="L56">                    final Task future_task = (Task)a[0];</span>
+
+<span class="nc bnc" id="L58" title="All 2 branches missed.">                    if(future_task.sentence.getOccurenceTime() &gt; n.time()) {</span>
+<span class="nc" id="L59">                        final Concept c = n.memory.concept(future_task.getTerm());</span>
+<span class="nc" id="L60">                        final float true_expectation = 0.5f;</span>
+<span class="nc" id="L61">                        final float false_expectation = 0.5f;</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">                        if(c != null) {</span>
+<span class="nc bnc" id="L63" title="All 4 branches missed.">                            if(c.desires.size() &gt; 0 &amp;&amp; c.beliefs.size() &gt; 0) {</span>
+                                //Fear:
+<span class="nc bnc" id="L65" title="All 2 branches missed.">                                if(future_task.sentence.truth.getExpectation() &gt; true_expectation &amp;&amp;</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                                   c.desires.get(0).sentence.truth.getExpectation() &lt; false_expectation) {</span>
+                                    //n.addInput(&quot;&lt;(*,{SELF},fear) --&gt; ^feel&gt;. :|:&quot;);
+<span class="nc" id="L68">                                    final float weight = future_task.getPriority();</span>
+<span class="nc" id="L69">                                    float fear = solutionQuality(true, c.desires.get(0), future_task.sentence, memory, n);</span>
+<span class="nc" id="L70">                                    final float newValue = fear*weight;</span>
+<span class="nc" id="L71">                                    fear += newValue * weight;</span>
+<span class="nc" id="L72">                                    fear /= 1.0f + weight;</span>
+                                    //incrase concept priority by fear value:
+<span class="nc" id="L74">                                    final Concept C1 = memory.concept(future_task.getTerm());</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                                    if(C1 != null) {</span>
+<span class="nc" id="L76">                                        C1.incPriority(fear);</span>
+                                    }
+<span class="nc" id="L78">                                    memory.emit(Answer.class, &quot;Fear value=&quot;+fear);</span>
+<span class="nc" id="L79">                                    System.out.println(&quot;Fear value=&quot;+fear);</span>
+                                }
+                            }
+                        }
+                    }
+<span class="nc" id="L84">                };</span>
+            }
+<span class="nc" id="L86">            memory.event.set(obs, enabled, Events.InduceSucceedingEvent.class, Events.TaskDerive.class);</span>
+        }
+<span class="nc" id="L88">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Similarity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.language</a> &gt; <span class="el_source">Similarity.java</span></div><h1>Similarity.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.language;
+
+import org.opennars.io.Symbols.NativeOperator;
+
+/**
+ * A Statement about a Similarity relation as defined in the NARS-theory
+ *
+ * @author Pei Wang
+ * @author Patrick Hammer
+ */
+public class Similarity extends Statement {
+
+    /**
+     * Constructor with partial values, called by make
+     * @param arg The component list of the term
+     */
+    public Similarity(final Term[] arg) {
+<span class="fc" id="L41">        super(arg);</span>
+        
+<span class="fc" id="L43">        init(arg);</span>
+<span class="fc" id="L44">    }</span>
+
+    public Similarity(final Term subj, final Term pred) {
+<span class="fc" id="L47">        this(new Term[] { subj, pred} );</span>
+<span class="fc" id="L48">    }</span>
+    
+
+    /**
+     * Clone an object
+     * @return A new object, to be casted into a Similarity
+     */
+    @Override
+    public Similarity clone() {
+<span class="nc" id="L57">        return new Similarity(term);</span>
+    }
+    
+    @Override public Similarity clone(final Term[] replaced) {
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if(replaced == null) {</span>
+<span class="nc" id="L62">            return null;</span>
+        }
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (replaced.length!=2)</span>
+<span class="nc" id="L65">            return null;</span>
+<span class="fc" id="L66">        return make(replaced[0], replaced[1]);</span>
+    }
+
+    /** alternate version of make that allows equivalent subject and predicate
+     * to be reduced to the common term.      */
+    public static Term makeTerm(final Term subject, final Term predicate) {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (subject.equals(predicate))</span>
+<span class="nc" id="L73">            return subject;                </span>
+<span class="nc" id="L74">        return make(subject, predicate);        </span>
+    }    
+    
+    /**
+     * Try to make a new compound from two term. Called by the inference rules.
+     * @param subject The first component
+     * @param predicate The second component
+     * @return A compound generated or null
+     */
+    public static Similarity make(final Term subject, final Term predicate) {
+
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (invalidStatement(subject, predicate)) {</span>
+<span class="fc" id="L86">            return null;</span>
+        }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (subject.compareTo(predicate) &gt; 0) {</span>
+<span class="fc" id="L89">            return make(predicate, subject);</span>
+        }        
+        
+<span class="fc" id="L92">        return new Similarity(subject, predicate);</span>
+    }
+
+    /**
+     * Get the operator of the term.
+     * @return the operator of the term
+     */
+    @Override
+    public NativeOperator operator() {
+<span class="fc" id="L101">        return NativeOperator.SIMILARITY;</span>
+    }
+
+    /**
+     * Check if the compound is commutative.
+     * @return true for commutative
+     */
+    @Override
+    public boolean isCommutative() {
+<span class="fc" id="L110">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

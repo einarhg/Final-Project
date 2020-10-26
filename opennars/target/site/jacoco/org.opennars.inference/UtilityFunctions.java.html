@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UtilityFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.inference</a> &gt; <span class="el_source">UtilityFunctions.java</span></div><h1>UtilityFunctions.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.inference;
+
+import static java.lang.Math.pow;
+import static java.lang.Math.sqrt;
+import org.opennars.main.Parameters;
+
+/**
+ * Common functions on real numbers, mostly in [0,1].
+ *
+ * @author Pei Wang
+ * @author Patrick Hammer
+ */
+<span class="nc" id="L36">public class UtilityFunctions {</span>
+    
+    /**
+     * A function where the output is conjunctively determined by the inputs
+     * @param arr The inputs, each in [0, 1]
+     * @return The output that is no larger than each input
+     */
+    public final static double and(final double... arr) {
+<span class="fc" id="L44">        float product = 1;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (final double f : arr) {</span>
+<span class="fc" id="L46">            product *= f;</span>
+        }
+<span class="fc" id="L48">        return product;</span>
+    }
+    
+    /**
+     * A function where the output is disjunctively determined by the inputs
+     * @param arr The inputs, each in [0, 1]
+     * @return The output that is no smaller than each input
+     */
+    public final static float or(final float... arr) {
+<span class="fc" id="L57">        float product = 1;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (final float f : arr) {</span>
+<span class="fc" id="L59">            product *= (1 - f);</span>
+        }
+<span class="fc" id="L61">        return 1 - product;</span>
+    }
+    
+    /**
+     * A function where the output is the arithmetic average the inputs
+     * @param arr The inputs, each in [0, 1]
+     * @return The arithmetic average the inputs
+     */
+    public final static float aveAri(final float... arr) {
+<span class="fc" id="L70">        float sum = 0;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (final float f : arr) {</span>
+<span class="fc" id="L72">            sum += f;</span>
+        }
+<span class="fc" id="L74">        return sum / arr.length;</span>
+    }
+
+    /**
+     * A function where the output is the geometric average the inputs
+     * @param arr The inputs, each in [0, 1]
+     * @return The geometric average the inputs
+     */
+    public final static float aveGeo(final float... arr) {
+<span class="fc" id="L83">        float product = 1;</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (final float f : arr) {</span>
+<span class="fc" id="L85">            product *= f;</span>
+        }
+        
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (arr.length == 2) {</span>
+<span class="nc" id="L89">            return (float)sqrt(arr[0]*arr[1]);</span>
+        }
+<span class="fc" id="L91">        return (float) pow(product, 1.00 / arr.length);</span>
+    }
+
+    /**
+     * A function to convert weight to confidence
+     * @param w Weight of evidence, a non-negative real number
+     * @param narParameters parameters of the reasoner
+     * @return The corresponding confidence, in [0, 1)
+     */
+    public final static double w2c(final double w, Parameters narParameters) {
+<span class="fc" id="L101">        return w / (w + narParameters.HORIZON);</span>
+    }
+
+    /**
+     * A function to convert confidence to weight
+     * @param c confidence, in [0, 1)
+     * @param narParameters parameters of the reasoner
+     * @return The corresponding weight of evidence, a non-negative real number
+     */
+    public final static double c2w(final double c, Parameters narParameters) {
+<span class="fc" id="L111">        return narParameters.HORIZON * c / (1 - c);</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

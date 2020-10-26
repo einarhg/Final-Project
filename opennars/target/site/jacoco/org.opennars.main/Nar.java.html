@@ -1,0 +1,725 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Nar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.main</a> &gt; <span class="el_source">Nar.java</span></div><h1>Nar.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.main;
+
+import org.apache.commons.lang3.StringUtils;
+import org.opennars.entity.*;
+import org.opennars.interfaces.Timable;
+import org.opennars.interfaces.pub.Reasoner;
+import org.opennars.io.ConfigReader;
+import org.opennars.io.Narsese;
+import org.opennars.io.Parser;
+import org.opennars.io.Symbols;
+import org.opennars.io.events.AnswerHandler;
+import org.opennars.io.events.EventEmitter;
+import org.opennars.io.events.EventEmitter.EventObserver;
+import org.opennars.io.events.Events;
+import org.opennars.io.events.Events.CyclesEnd;
+import org.opennars.io.events.Events.CyclesStart;
+import org.opennars.io.events.OutputHandler.ERR;
+import org.opennars.language.Inheritance;
+import org.opennars.language.SetExt;
+import org.opennars.language.Tense;
+import org.opennars.language.Term;
+import org.opennars.operator.Operator;
+import org.opennars.plugin.Plugin;
+import org.opennars.plugin.perception.SensoryChannel;
+import org.opennars.storage.Bag;
+import org.opennars.storage.Memory;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.text.ParseException;
+import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.opennars.language.SetInt;
+import org.opennars.plugin.mental.Emotions;
+import org.opennars.plugin.mental.InternalExperience;
+
+
+/**
+ * Non-Axiomatic Reasoner
+ *
+ * Instances of this represent a reasoner connected to a Memory, and set of Input and Output channels.
+ *
+ * All state is contained within Memory.  A Nar is responsible for managing I/O channels and executing
+ * memory operations.  It executesa series sof cycles in two possible modes:
+ *   * step mode - controlled by an outside system, such as during debugging or testing
+ *   * thread mode - runs in a pausable closed-loop at a specific maximum framerate.
+ *
+ * @author Pei Wang
+ * @author Patrick Hammer
+ */
+public class Nar extends SensoryChannel implements Reasoner, Serializable, Runnable {
+<span class="pc" id="L79">    public Parameters narParameters = new Parameters();</span>
+
+    /* System clock, relatively defined to guarantee the repeatability of behaviors */
+<span class="pc" id="L82">    private Long cycle = new Long(0);</span>
+
+    /**
+     * The information about the version of the project
+     */
+    public static final String VERSION = &quot;v3.0.4&quot;;
+
+    /**
+     * Name of the reasoner of the project
+     */
+    public static final String NAME = &quot;Open-NARS&quot;;
+
+    /**
+     * The project web sites.
+     */
+    public static final String WEBSITE =
+            &quot; Open-NARS website:  http://code.google.com/p/open-org.opennars/ \n&quot;
+                    + &quot;      NARS website:  http://sites.google.com/site/narswang/ \n&quot; +
+                    &quot;    Github website:  http://github.com/opennars/ \n&quot; +
+                    &quot;    IRC:  http://webchat.freenode.net/?channels=org.opennars \n&quot;;
+
+<span class="pc" id="L103">    private transient Thread[] threads = null;</span>
+<span class="pc" id="L104">    protected transient Map&lt;Term,SensoryChannel&gt; sensoryChannels = new LinkedHashMap&lt;&gt;();</span>
+    public void addSensoryChannel(final String term, final SensoryChannel channel) {
+        try {
+<span class="fc" id="L107">            sensoryChannels.put(new Narsese(this).parseTerm(term), channel);</span>
+<span class="nc" id="L108">        } catch (final Parser.InvalidInputException ex) {</span>
+<span class="nc" id="L109">            Logger.getLogger(Nar.class.getName()).log(Level.SEVERE, null, ex);</span>
+<span class="nc" id="L110">            throw new IllegalStateException(&quot;Could not add sensory channel.&quot;, ex);</span>
+<span class="fc" id="L111">        }</span>
+<span class="fc" id="L112">    }</span>
+    
+    public void SaveToFile(final String name) throws IOException {
+<span class="fc" id="L115">        final FileOutputStream outStream = new FileOutputStream(name);</span>
+<span class="fc" id="L116">        final ObjectOutputStream stream = new ObjectOutputStream(outStream);</span>
+<span class="fc" id="L117">        stream.writeObject(this);</span>
+<span class="fc" id="L118">        outStream.close();</span>
+<span class="fc" id="L119">    }</span>
+    
+    public static Nar LoadFromFile(final String name) throws IOException, ClassNotFoundException, 
+            IllegalAccessException, ParseException, ParserConfigurationException, SAXException, 
+            NoSuchMethodException, InstantiationException, InvocationTargetException {
+<span class="fc" id="L124">        final FileInputStream inStream = new FileInputStream(name);</span>
+<span class="fc" id="L125">        final ObjectInputStream stream = new ObjectInputStream(inStream);</span>
+<span class="fc" id="L126">        final Nar ret = (Nar) stream.readObject();</span>
+<span class="fc" id="L127">        ret.memory.event = new EventEmitter();</span>
+<span class="fc" id="L128">        ret.plugins = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L129">        ret.sensoryChannels = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L130">        List&lt;Plugin&gt; pluginsToAdd = ConfigReader.loadParamsFromFileAndReturnPlugins(ret.usedConfigFilePath, ret, ret.narParameters);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for(Plugin p : pluginsToAdd) {</span>
+<span class="fc" id="L132">            ret.addPlugin(p);</span>
+<span class="fc" id="L133">        }</span>
+<span class="fc" id="L134">        return ret;</span>
+    }
+
+    volatile long minCyclePeriodMS;
+
+    /**
+     * The name of the reasoner
+     */
+    protected String name;
+    /**
+     * The memory of the reasoner
+     */
+    public final Memory memory;
+
+    public class PluginState implements Serializable {
+        final public Plugin plugin;
+<span class="fc" id="L150">        boolean enabled = false;</span>
+
+        public PluginState(final Plugin plugin) {
+<span class="fc" id="L153">            this(plugin,true);</span>
+<span class="fc" id="L154">        }</span>
+
+<span class="fc" id="L156">        public PluginState(final Plugin plugin, final boolean enabled) {</span>
+<span class="fc" id="L157">            this.plugin = plugin;</span>
+<span class="fc" id="L158">            setEnabled(enabled);</span>
+<span class="fc" id="L159">        }</span>
+
+        public void setEnabled(final boolean enabled) {
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (this.enabled == enabled) return;</span>
+
+<span class="fc" id="L164">            plugin.setEnabled(Nar.this, enabled);</span>
+<span class="fc" id="L165">            this.enabled = enabled;</span>
+<span class="fc" id="L166">            emit(Events.PluginsChange.class, plugin, enabled);</span>
+<span class="fc" id="L167">        }</span>
+
+        public boolean isEnabled() {
+<span class="nc" id="L170">            return enabled;</span>
+        }
+    }
+
+<span class="pc" id="L174">    protected transient List&lt;PluginState&gt; plugins = new ArrayList&lt;&gt;(); //was CopyOnWriteArrayList</span>
+
+    /** Flag for running continuously  */
+<span class="pc" id="L177">    private transient boolean running = false;</span>
+    /** used by stop() to signal that a running loop should be interrupted */
+<span class="pc" id="L179">    private transient boolean stopped = false;</span>
+    private transient boolean threadYield;
+
+    public static final String DEFAULTCONFIG_FILEPATH = &quot;./config/defaultConfig.xml&quot;;
+    
+    /** constructs the NAR and loads a config from the default filepath
+     *
+     * @param narId inter NARS id of this NARS instance
+     */
+    public Nar(long narId) throws IOException, InstantiationException, InvocationTargetException, NoSuchMethodException, 
+            ParserConfigurationException, IllegalAccessException, SAXException, ClassNotFoundException, ParseException {
+<span class="nc" id="L190">        this(narId, DEFAULTCONFIG_FILEPATH);</span>
+<span class="nc" id="L191">    }</span>
+
+<span class="pc" id="L193">    public String usedConfigFilePath = &quot;&quot;;</span>
+    /** constructs the NAR and loads a config from the filepath
+     *
+     * @param narId inter NARS id of this NARS instance
+     * @param relativeConfigFilePath (relative) path of the XML encoded config file
+     */
+    public Nar(long narId, String relativeConfigFilePath) throws IOException, InstantiationException, InvocationTargetException, 
+<span class="fc" id="L200">            NoSuchMethodException, ParserConfigurationException, SAXException, IllegalAccessException, ParseException, ClassNotFoundException {</span>
+<span class="fc" id="L201">        List&lt;Plugin&gt; pluginsToAdd = ConfigReader.loadParamsFromFileAndReturnPlugins(relativeConfigFilePath, this, this.narParameters);</span>
+<span class="fc" id="L202">        final Memory m = new Memory(this.narParameters,</span>
+                new Bag(narParameters.CONCEPT_BAG_LEVELS, narParameters.CONCEPT_BAG_SIZE, this.narParameters),
+                new Bag&lt;&gt;(narParameters.NOVEL_TASK_BAG_LEVELS, narParameters.NOVEL_TASK_BAG_SIZE, this.narParameters),
+                new Bag&lt;&gt;(narParameters.SEQUENCE_BAG_LEVELS, narParameters.SEQUENCE_BAG_SIZE, this.narParameters),
+                new Bag&lt;&gt;(narParameters.OPERATION_BAG_LEVELS, narParameters.OPERATION_BAG_SIZE, this.narParameters));
+<span class="fc" id="L207">        this.memory = m;</span>
+<span class="fc" id="L208">        this.memory.narId = narId;</span>
+<span class="fc" id="L209">        this.usedConfigFilePath = relativeConfigFilePath;</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        for(Plugin p : pluginsToAdd) { //adding after memory is constructed, as memory depends on the loaded params!!</span>
+<span class="fc" id="L211">            this.addPlugin(p);</span>
+<span class="fc" id="L212">        }</span>
+<span class="fc" id="L213">    }</span>
+
+    /** constructs the NAR and loads a config from the filepath
+     *
+     * @param narId inter NARS id of this NARS instance
+     * @param relativeConfigFilePath (relative) path of the XML encoded config file
+     * @param parameterOverrides (overwritten) parameters of a Reasoner
+     */
+    public Nar(long narId, String relativeConfigFilePath, final Map&lt;String, Object&gt; parameterOverrides) throws IOException, InstantiationException, InvocationTargetException,
+<span class="nc" id="L222">        NoSuchMethodException, ParserConfigurationException, SAXException, IllegalAccessException, ParseException, ClassNotFoundException {</span>
+<span class="nc" id="L223">        List&lt;Plugin&gt; pluginsToAdd = ConfigReader.loadParamsFromFileAndReturnPlugins(relativeConfigFilePath, this, this.narParameters);</span>
+<span class="nc" id="L224">        overrideParameters(narParameters, parameterOverrides);</span>
+<span class="nc" id="L225">        final Memory m = new Memory(this.narParameters,</span>
+            new Bag(narParameters.CONCEPT_BAG_LEVELS, narParameters.CONCEPT_BAG_SIZE, this.narParameters),
+            new Bag&lt;&gt;(narParameters.NOVEL_TASK_BAG_LEVELS, narParameters.NOVEL_TASK_BAG_SIZE, this.narParameters),
+            new Bag&lt;&gt;(narParameters.SEQUENCE_BAG_LEVELS, narParameters.SEQUENCE_BAG_SIZE, this.narParameters),
+            new Bag&lt;&gt;(narParameters.OPERATION_BAG_LEVELS, narParameters.OPERATION_BAG_SIZE, this.narParameters));
+<span class="nc" id="L230">        this.memory = m;</span>
+<span class="nc" id="L231">        this.memory.narId = narId;</span>
+<span class="nc" id="L232">        this.usedConfigFilePath = relativeConfigFilePath;</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">        for(Plugin p : pluginsToAdd) { //adding after memory is constructed, as memory depends on the loaded params!!</span>
+<span class="nc" id="L234">            this.addPlugin(p);</span>
+<span class="nc" id="L235">        }</span>
+
+<span class="nc" id="L237">    }</span>
+    
+    /** constructs the NAR and loads a config from the filepath
+     *
+     * @param relativeConfigFilePath (relative) path of the XML encoded config file
+     */
+    public Nar(String relativeConfigFilePath) throws IOException, InstantiationException, InvocationTargetException, 
+            NoSuchMethodException, ParserConfigurationException, SAXException, IllegalAccessException, ParseException, ClassNotFoundException {
+<span class="fc" id="L245">        this(java.util.UUID.randomUUID().getLeastSignificantBits(), relativeConfigFilePath);</span>
+<span class="fc" id="L246">    }</span>
+
+    /** constructs the NAR and loads a config from the filepath
+     *
+     * @param relativeConfigFilePath (relative) path of the XML encoded config file
+     * @param parameterOverrides (overwritten) parameters of a Reasoner
+     */
+    public Nar(String relativeConfigFilePath, final Map&lt;String, Object&gt; parameterOverrides) throws IOException, InstantiationException, InvocationTargetException,
+        NoSuchMethodException, ParserConfigurationException, SAXException, IllegalAccessException, ParseException, ClassNotFoundException {
+<span class="nc" id="L255">        this(java.util.UUID.randomUUID().getLeastSignificantBits(), relativeConfigFilePath, parameterOverrides);</span>
+<span class="nc" id="L256">    }</span>
+    
+    /** constructs the NAR and loads a config from the default filepath
+     *
+     * Assigns a random id to the instance
+     */
+    public Nar() throws IOException, InstantiationException, InvocationTargetException, NoSuchMethodException, ParserConfigurationException, IllegalAccessException, SAXException, ClassNotFoundException, ParseException {
+<span class="fc" id="L263">        this(DEFAULTCONFIG_FILEPATH);</span>
+<span class="fc" id="L264">    }</span>
+
+    /** constructs the NAR and loads a config from the default filepath
+     *
+     * Assigns a random id to the instance
+     *
+     * @param parameterOverrides (overwritten) parameters of a Reasoner
+     */
+    public Nar(final Map&lt;String, Object&gt; parameterOverrides) throws IOException, InstantiationException, InvocationTargetException, NoSuchMethodException, ParserConfigurationException, IllegalAccessException, SAXException, ClassNotFoundException, ParseException {
+<span class="nc" id="L273">        this(DEFAULTCONFIG_FILEPATH, parameterOverrides);</span>
+<span class="nc" id="L274">    }</span>
+
+    /**
+     * Reset the system with an empty memory and reset clock. Called locally.
+     */
+    public void reset() {
+<span class="fc" id="L280">        cycle = (long) 0;</span>
+<span class="fc" id="L281">        memory.reset();</span>
+<span class="fc" id="L282">    }</span>
+
+    /**
+     * Generally the text will consist of Task's to be parsed in Narsese, but
+     * may contain other commands recognized by the system. The creationTime
+     * will be set to the current memory cycle time, but may be processed by
+     * memory later according to the length of the input queue.
+     */
+    private boolean addMultiLineInput(final String text) {
+<span class="nc" id="L291">        final String[] lines = text.split(&quot;\n&quot;);</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        for(final String s : lines) {</span>
+<span class="nc" id="L293">            addInput(s);</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">            if(!running) {</span>
+<span class="nc" id="L295">                this.cycle();</span>
+            }
+        }
+<span class="nc" id="L298">        return true;</span>
+    }
+    
+    private boolean addCommand(final String text) throws IOException {
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        if(text.startsWith(&quot;**&quot;)) {</span>
+<span class="fc" id="L303">            this.reset();</span>
+<span class="fc" id="L304">            return true;</span>
+        }
+        else
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">        if(text.startsWith(&quot;*decisionthreshold=&quot;)) { //TODO use reflection for narParameters, allow to set others too</span>
+<span class="nc" id="L308">            final Double value = Double.valueOf(text.split(&quot;decisionthreshold=&quot;)[1]);</span>
+<span class="nc" id="L309">            narParameters.DECISION_THRESHOLD = value.floatValue();</span>
+<span class="nc" id="L310">            return true;</span>
+        }
+        else
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        if(text.startsWith(&quot;*volume=&quot;)) {</span>
+<span class="nc" id="L314">            final Integer value = Integer.valueOf(text.split(&quot;volume=&quot;)[1]);</span>
+<span class="nc" id="L315">            narParameters.VOLUME = value;</span>
+<span class="nc" id="L316">            return true;</span>
+        }
+        else
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        if(text.startsWith(&quot;*threads=&quot;)) {</span>
+<span class="nc" id="L320">            final Integer value = Integer.valueOf(text.split(&quot;threads=&quot;)[1]);</span>
+<span class="nc" id="L321">            narParameters.THREADS_AMOUNT = value;</span>
+<span class="nc" id="L322">            return true;</span>
+        }
+        else
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        if(text.startsWith(&quot;*save=&quot;)) {</span>
+<span class="nc" id="L326">            final String filename = text.split(&quot;save=&quot;)[1];</span>
+<span class="nc" id="L327">            boolean wasRunning = this.isRunning();</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">            if(wasRunning) {</span>
+<span class="nc" id="L329">                this.stop();</span>
+            }
+<span class="nc" id="L331">            this.SaveToFile(filename);</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">            if(wasRunning) {</span>
+<span class="nc" id="L333">                this.start(this.minCyclePeriodMS);</span>
+            }
+<span class="nc" id="L335">            return true;</span>
+        }
+        else
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        if(text.startsWith(&quot;*speed=&quot;)) {</span>
+<span class="nc" id="L339">            final Integer value = Integer.valueOf(text.split(&quot;speed=&quot;)[1]);</span>
+<span class="nc" id="L340">            this.minCyclePeriodMS = value;</span>
+<span class="nc" id="L341">            return true;</span>
+        }
+        else
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        if(StringUtils.isNumeric(text)) {</span>
+<span class="fc" id="L345">            final Integer retVal = Integer.parseInt(text);</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">            if(!running) {</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">                for(int i=0;i&lt;retVal;i++) {</span>
+<span class="fc" id="L348">                    this.cycle();</span>
+                }
+            }
+<span class="fc" id="L351">            return true;</span>
+        } else {
+<span class="fc" id="L353">            return false;</span>
+        }
+    }
+    
+    public void addInput(String text) {
+<span class="fc" id="L358">        text = text.trim();</span>
+<span class="fc" id="L359">        final Parser narsese = new Narsese(this);</span>
+<span class="pc bpc" id="L360" title="3 of 4 branches missed.">        if (text.contains(&quot;\n&quot;) &amp;&amp; addMultiLineInput(text)) {</span>
+<span class="nc" id="L361">            return;</span>
+        }
+        //Ignore any input that is just a comment
+<span class="fc bfc" id="L364" title="All 6 branches covered.">        if(text.startsWith(&quot;\'&quot;) || text.startsWith(&quot;//&quot;) || text.trim().length() &lt;= 0) {</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">            if(text.trim().length() &gt; 0) {</span>
+<span class="fc" id="L366">                emit(org.opennars.io.events.OutputHandler.ECHO.class, text);</span>
+            }
+<span class="fc" id="L368">            return;</span>
+        }
+        try {
+<span class="fc bfc" id="L371" title="All 2 branches covered.">            if(addCommand(text)) {</span>
+<span class="fc" id="L372">                return;</span>
+            }
+<span class="nc" id="L374">        } catch (IOException ex) {</span>
+<span class="nc" id="L375">            throw new IllegalStateException(&quot;I/O command failed: &quot; + text, ex);</span>
+<span class="fc" id="L376">        }</span>
+<span class="fc" id="L377">        Task task = null;</span>
+        try {
+<span class="fc" id="L379">            task = narsese.parseTask(text);</span>
+<span class="nc" id="L380">        } catch (final Parser.InvalidInputException e) {</span>
+<span class="nc bnc" id="L381" title="All 2 branches missed.">            if(Debug.SHOW_INPUT_ERRORS) {</span>
+<span class="nc" id="L382">                emit(ERR.class, e);</span>
+            }
+<span class="nc bnc" id="L384" title="All 2 branches missed.">            if(!Debug.INPUT_ERRORS_CONTINUE) {</span>
+<span class="nc" id="L385">                throw new IllegalStateException(&quot;Invalid input: &quot; + text, e);</span>
+            }
+<span class="nc" id="L387">            return;</span>
+<span class="fc" id="L388">        }</span>
+        // check if it should go to a sensory channel and dispatch to it instead
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        if (dispatchToSensoryChannel(task)) {</span>
+<span class="fc" id="L391">            return;</span>
+        }
+
+        //else input into NARS directly:
+<span class="fc" id="L395">        this.memory.inputTask(this, task);</span>
+<span class="fc" id="L396">    }</span>
+
+    /**
+     * dispatches the task to the sensory channel if necessary
+     * @param task dispatched task
+     * @return was it dispatched to a sensory channel?
+     */
+    private boolean dispatchToSensoryChannel(Task task) {
+<span class="fc" id="L404">        final Term t = task.getTerm();</span>
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">        if(t != null) {</span>
+<span class="fc" id="L406">            Term predicate = null;</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">            if(t instanceof Inheritance) {</span>
+<span class="fc" id="L408">                predicate = ((Inheritance) t).getPredicate();</span>
+            } else {
+<span class="fc" id="L410">                predicate = SetInt.make(new Term(&quot;OBSERVED&quot;));</span>
+            }
+<span class="fc bfc" id="L412" title="All 2 branches covered.">            if(this.sensoryChannels.containsKey(predicate)) {</span>
+                // transform to channel-specific coordinate if available.
+<span class="fc" id="L414">                int channelWidth = this.sensoryChannels.get(predicate).width;</span>
+<span class="fc" id="L415">                int channelHeight = this.sensoryChannels.get(predicate).height;</span>
+<span class="pc bpc" id="L416" title="3 of 6 branches missed.">                if(channelWidth != 0 &amp;&amp; channelHeight != 0 &amp;&amp; (t instanceof Inheritance) &amp;&amp;</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">                        (((Inheritance )t).getSubject() instanceof SetExt)) {</span>
+<span class="fc" id="L418">                    final SetExt subj = (SetExt) ((Inheritance) t).getSubject();</span>
+                    // map to pei's -1 to 1 indexing schema
+<span class="fc bfc" id="L420" title="All 2 branches covered.">                    if(subj.term[0].term_indices == null) {</span>
+<span class="fc" id="L421">                        final String variable = subj.toString().split(&quot;\\[&quot;)[0];</span>
+<span class="fc" id="L422">                        final String[] vals = subj.toString().split(&quot;\\[&quot;)[1].split(&quot;\\]&quot;)[0].split(&quot;,&quot;);</span>
+<span class="fc" id="L423">                        final double height = Double.parseDouble(vals[0]);</span>
+<span class="fc" id="L424">                        final double width = Double.parseDouble(vals[1]);</span>
+<span class="fc" id="L425">                        final int wval = (int) Math.round((width+1.0f)/2.0f*(this.sensoryChannels.get(predicate).width-1));</span>
+<span class="fc" id="L426">                        final int hval = (int) Math.round(((height+1.0f)/2.0f*(this.sensoryChannels.get(predicate).height-1)));</span>
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">                        final String ev = task.sentence.isEternal() ? &quot; &quot; : &quot; :|: &quot;;</span>
+<span class="fc" id="L428">                        final String newInput = &quot;&lt;&quot;+variable+&quot;[&quot;+hval+&quot;,&quot;+wval+&quot;]} --&gt; &quot; + predicate + &quot;&gt;&quot; +</span>
+<span class="fc" id="L429">                                          task.sentence.punctuation + ev + task.sentence.truth.toString();</span>
+                        //this.emit(OutputHandler.IN.class, task); too expensive to print each input task, consider vision :)
+<span class="fc" id="L431">                        this.addInput(newInput);</span>
+<span class="fc" id="L432">                        return true;</span>
+                    }
+                }
+<span class="fc" id="L435">                this.sensoryChannels.get(predicate).addInput(task, this);</span>
+<span class="fc" id="L436">                return true;</span>
+            }
+        }
+<span class="fc" id="L439">        return false;</span>
+    }
+
+    public void addInputFile(final String s) {
+<span class="fc" id="L443">        try (final BufferedReader br = new BufferedReader(new FileReader(s))) {</span>
+            String line;
+<span class="fc bfc" id="L445" title="All 2 branches covered.">            while ((line = br.readLine()) != null) {</span>
+<span class="fc bfc" id="L446" title="All 2 branches covered.">                if(!line.isEmpty()) {</span>
+                    //Loading experience file lines, or else just normal input lines
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">                    if(line.matches(&quot;([A-Za-z])+:(.*)&quot;)) {</span>
+                        //Extract creation time:
+<span class="nc bnc" id="L450" title="All 2 branches missed.">                        if(!line.startsWith(&quot;IN:&quot;)) {</span>
+<span class="nc" id="L451">                            continue; //ignore</span>
+                        }
+<span class="nc" id="L453">                        String[] spl = line.replace(&quot;IN:&quot;, &quot;&quot;).split(&quot;\\{&quot;);</span>
+<span class="nc" id="L454">                        int creationTime = Integer.parseInt(spl[spl.length-1].split(&quot; :&quot;)[0].split(&quot;\\|&quot;)[0]);</span>
+<span class="nc bnc" id="L455" title="All 2 branches missed.">                        while(this.time() &lt; creationTime) {</span>
+<span class="nc" id="L456">                            this.cycles(1);</span>
+                        }
+<span class="nc" id="L458">                        String lineReconstructed = &quot;&quot;; //the line but without the stamp info at the end</span>
+<span class="nc bnc" id="L459" title="All 2 branches missed.">                        for(int i=0; i&lt;spl.length-1; i++) {</span>
+<span class="nc" id="L460">                            lineReconstructed += spl[i] + &quot;{&quot;;</span>
+                        }
+<span class="nc" id="L462">                        lineReconstructed = lineReconstructed.substring(0, lineReconstructed.length()-1);</span>
+<span class="nc" id="L463">                        this.addInput(lineReconstructed.trim());</span>
+<span class="nc" id="L464">                    } else {</span>
+<span class="fc" id="L465">                        this.addInput(line);</span>
+                    }
+                }
+            }
+<span class="nc" id="L469">        } catch (final Exception ex) {</span>
+<span class="nc" id="L470">            Logger.getLogger(Nar.class.getName()).log(Level.SEVERE, null, ex);</span>
+<span class="nc" id="L471">            throw new IllegalStateException(&quot;Loading experience file failed &quot;, ex);</span>
+<span class="fc" id="L472">        }</span>
+<span class="fc" id="L473">    }</span>
+
+
+    /** gets a concept if it exists, or returns null if it does not */
+    public Concept concept(final String concept) throws Parser.InvalidInputException {
+<span class="fc" id="L478">        return memory.concept(new Narsese(this).parseTerm(concept));</span>
+    }
+
+    public Nar ask(final String termString, final AnswerHandler answered) throws Parser.InvalidInputException {
+<span class="fc" id="L482">        final Sentence sentenceForNewTask = new Sentence(</span>
+<span class="fc" id="L483">            new Narsese(this).parseTerm(termString),</span>
+            Symbols.QUESTION_MARK,
+            null,
+            new Stamp(this, memory, Tense.Eternal));
+<span class="fc" id="L487">        final BudgetValue budget = new BudgetValue(</span>
+            narParameters.DEFAULT_QUESTION_PRIORITY,
+            narParameters.DEFAULT_QUESTION_DURABILITY,
+            1, narParameters);
+<span class="fc" id="L491">        final Task t = new Task(sentenceForNewTask, budget, Task.EnumType.INPUT);</span>
+
+<span class="fc" id="L493">        addInput(t, this);</span>
+
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">        if (answered!=null) {</span>
+<span class="fc" id="L496">            answered.start(t, this);</span>
+        }
+<span class="fc" id="L498">        return this;</span>
+
+    }
+
+    public Nar askNow(final String termString, final AnswerHandler answered) throws Parser.InvalidInputException {
+<span class="nc" id="L503">        final Sentence sentenceForNewTask = new Sentence(</span>
+<span class="nc" id="L504">            new Narsese(this).parseTerm(termString),</span>
+            Symbols.QUESTION_MARK,
+            null,
+            new Stamp(this, memory, Tense.Present));
+<span class="nc" id="L508">        final BudgetValue budgetForNewTask = new BudgetValue(</span>
+            narParameters.DEFAULT_QUESTION_PRIORITY,
+            narParameters.DEFAULT_QUESTION_DURABILITY,
+            1, narParameters);
+<span class="nc" id="L512">        final Task t = new Task(sentenceForNewTask, budgetForNewTask, Task.EnumType.INPUT);</span>
+
+<span class="nc" id="L514">        addInput(t, this);</span>
+
+<span class="nc bnc" id="L516" title="All 2 branches missed.">        if (answered!=null) {</span>
+<span class="nc" id="L517">            answered.start(t, this);</span>
+        }
+<span class="nc" id="L519">        return this;</span>
+
+    }
+
+    public Nar addInput(final Task t, final Timable time) {
+<span class="fc" id="L524">        this.memory.inputTask(this, t);</span>
+<span class="fc" id="L525">        return this;</span>
+    }
+
+    /** attach event handler */
+    public void on(final Class c, final EventObserver o) {
+<span class="nc" id="L530">        memory.event.on(c, o);</span>
+<span class="nc" id="L531">    }</span>
+
+    /** remove event handler */
+    public void off(final Class c, final EventObserver o) {
+<span class="nc" id="L535">        memory.event.off(c, o);</span>
+<span class="nc" id="L536">    }</span>
+
+    /** set an event handler. useful for multiple events. */
+    public void event(final EventObserver e, final boolean enabled, final Class... events) {
+<span class="fc" id="L540">        memory.event.set(e, enabled, events);</span>
+<span class="fc" id="L541">    }</span>
+
+    public void addPlugin(final Plugin p) {
+<span class="fc bfc" id="L544" title="All 2 branches covered.">        if(p instanceof SensoryChannel) {</span>
+<span class="fc" id="L545">            this.addSensoryChannel(((SensoryChannel) p).getName(), (SensoryChannel) p);</span>
+        }
+        else
+<span class="fc bfc" id="L548" title="All 2 branches covered.">        if (p instanceof Operator) {</span>
+<span class="fc" id="L549">            memory.addOperator((Operator)p);</span>
+        }
+        else
+<span class="fc bfc" id="L552" title="All 2 branches covered.">        if(p instanceof Emotions) {</span>
+<span class="fc" id="L553">            memory.emotion = (Emotions) p;</span>
+        }
+        else
+<span class="pc bpc" id="L556" title="1 of 2 branches missed.">        if(p instanceof InternalExperience) {</span>
+<span class="fc" id="L557">            memory.internalExperience = (InternalExperience) p;</span>
+        }
+<span class="fc" id="L559">        final PluginState ps = new PluginState(p);</span>
+<span class="fc" id="L560">        plugins.add(ps);</span>
+<span class="fc" id="L561">        emit(Events.PluginsChange.class, p, null);</span>
+<span class="fc" id="L562">    }</span>
+
+    public void removePlugin(final PluginState ps) {
+<span class="nc bnc" id="L565" title="All 2 branches missed.">        if (plugins.remove(ps)) {</span>
+<span class="nc" id="L566">            final Plugin p = ps.plugin;</span>
+<span class="nc bnc" id="L567" title="All 2 branches missed.">            if (p instanceof Operator) {</span>
+<span class="nc" id="L568">                memory.removeOperator((Operator)p);</span>
+            }
+<span class="nc bnc" id="L570" title="All 2 branches missed.">            if (p instanceof SensoryChannel) {</span>
+<span class="nc" id="L571">                sensoryChannels.remove(p);</span>
+            }
+            //TODO sensory channels can be plugins
+<span class="nc" id="L574">            ps.setEnabled(false);</span>
+<span class="nc" id="L575">            emit(Events.PluginsChange.class, null, p);</span>
+        }
+<span class="nc" id="L577">    }</span>
+
+    public List&lt;PluginState&gt; getPlugins() {
+<span class="nc" id="L580">        return Collections.unmodifiableList(plugins);</span>
+    }
+
+
+    public void start(final long minCyclePeriodMS) {
+<span class="nc" id="L585">        this.minCyclePeriodMS = minCyclePeriodMS;</span>
+<span class="nc bnc" id="L586" title="All 2 branches missed.">        if (threads == null) {</span>
+<span class="nc" id="L587">            int n_threads = narParameters.THREADS_AMOUNT;</span>
+<span class="nc" id="L588">            threads = new Thread[n_threads];</span>
+<span class="nc bnc" id="L589" title="All 2 branches missed.">            for(int i=0;i&lt;n_threads;i++) {</span>
+<span class="nc" id="L590">                threads[i] = new Thread(this, &quot;Inference&quot;+i);</span>
+<span class="nc" id="L591">                threads[i].start();</span>
+            }
+        }
+<span class="nc" id="L594">        running = true;</span>
+<span class="nc" id="L595">    }</span>
+    public void start() {
+<span class="nc" id="L597">        start(narParameters.MILLISECONDS_PER_STEP);</span>
+<span class="nc" id="L598">    }</span>
+
+    /**
+     * Stop the inference process, killing its thread.
+     */
+    public void stop() {
+<span class="pc bpc" id="L604" title="1 of 2 branches missed.">        if (threads!=null) {</span>
+<span class="nc bnc" id="L605" title="All 2 branches missed.">            for(Thread thread : threads) {</span>
+<span class="nc" id="L606">                thread.interrupt();</span>
+            }
+<span class="nc" id="L608">            threads = null;</span>
+        }
+<span class="fc" id="L610">        stopped = true;</span>
+<span class="fc" id="L611">        running = false;</span>
+<span class="fc" id="L612">    }</span>
+
+    /** Execute a fixed number of cycles.*/
+    public void cycles(final int cycles) {
+<span class="fc" id="L616">        memory.allowExecution = true;</span>
+<span class="fc" id="L617">        emit(CyclesStart.class);</span>
+<span class="fc" id="L618">        final boolean wasRunning = running;</span>
+<span class="fc" id="L619">        running = true;</span>
+<span class="fc" id="L620">        stopped = false;</span>
+<span class="fc bfc" id="L621" title="All 2 branches covered.">        for(int i=0;i&lt;cycles;i++) {</span>
+<span class="fc" id="L622">            cycle();</span>
+        }
+<span class="fc" id="L624">        running = wasRunning;</span>
+<span class="fc" id="L625">        emit(CyclesEnd.class);</span>
+<span class="fc" id="L626">    }</span>
+
+    /** Main loop executed by the Thread.  Should not be called directly. */
+    @Override public void run() {
+<span class="nc" id="L630">        stopped = false;</span>
+
+<span class="nc bnc" id="L632" title="All 4 branches missed.">        while (running &amp;&amp; !stopped) {</span>
+<span class="nc" id="L633">            emit(CyclesStart.class);</span>
+<span class="nc" id="L634">            cycle();</span>
+<span class="nc" id="L635">            emit(CyclesEnd.class);</span>
+
+<span class="nc bnc" id="L637" title="All 2 branches missed.">            if (minCyclePeriodMS &gt; 0) {</span>
+                try {
+<span class="nc" id="L639">                    Thread.sleep(minCyclePeriodMS);</span>
+<span class="nc" id="L640">                } catch (final InterruptedException e) {</span>
+<span class="nc" id="L641">                }</span>
+            }
+<span class="nc bnc" id="L643" title="All 2 branches missed.">            else if (threadYield) {</span>
+<span class="nc" id="L644">                Thread.yield();</span>
+            }
+        }
+<span class="nc" id="L647">    }</span>
+
+    public void emit(final Class c, final Object... o) {
+<span class="fc" id="L650">        memory.event.emit(c, o);</span>
+<span class="fc" id="L651">    }</span>
+
+    /**
+     * A frame, consisting of one or more Nar memory cycles
+     */
+    public void cycle() {
+        try {
+<span class="fc" id="L658">            memory.cycle(this);</span>
+
+<span class="fc" id="L660">            synchronized (cycle) {</span>
+<span class="fc" id="L661">                cycle++;</span>
+<span class="fc" id="L662">            }</span>
+        }
+<span class="nc" id="L664">        catch (final Exception e) {</span>
+<span class="nc bnc" id="L665" title="All 2 branches missed.">            if(Debug.SHOW_REASONING_ERRORS) {</span>
+<span class="nc" id="L666">                emit(ERR.class, e);</span>
+            }
+<span class="nc bnc" id="L668" title="All 2 branches missed.">            if(!Debug.REASONING_ERRORS_CONTINUE) {</span>
+<span class="nc" id="L669">                throw new IllegalStateException(&quot;Reasoning error:\n&quot;, e);</span>
+            }
+<span class="fc" id="L671">        }</span>
+<span class="fc" id="L672">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L676">        return memory.toString();</span>
+    }
+
+
+    public long time() {
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">        if(narParameters.STEPS_CLOCK) {</span>
+<span class="fc" id="L682">            return cycle;</span>
+        } else {
+<span class="nc" id="L684">            return System.currentTimeMillis();</span>
+        }
+    }
+
+    public boolean isRunning() {
+<span class="nc" id="L689">        return running;</span>
+    }
+    
+    public long getMinCyclePeriodMS() {
+<span class="nc" id="L693">        return minCyclePeriodMS;</span>
+    }
+
+    /** When b is true, Nar will call Thread.yield each run() iteration that minCyclePeriodMS==0 (no delay).
+     *  This is for improving program responsiveness when Nar is run with no delay.
+     */
+    public void setThreadYield(final boolean b) {
+<span class="nc" id="L700">        this.threadYield = b;</span>
+<span class="nc" id="L701">    }</span>
+
+
+    /**
+     * overrides parameter values by name
+     * @param parameters (overwritten) parameters of a Reasoner
+     * @param overrides specific override values by parameter name
+     */
+    private static void overrideParameters(Parameters parameters, Map&lt;String, Object&gt; overrides) {
+<span class="nc bnc" id="L710" title="All 2 branches missed.">        for (final Map.Entry&lt;String, Object&gt; iOverride : overrides.entrySet()) {</span>
+<span class="nc" id="L711">            final String propertyName = iOverride.getKey();</span>
+<span class="nc" id="L712">            final Object value = iOverride.getValue();</span>
+
+            try {
+<span class="nc" id="L715">                final Field fieldOfProperty = Parameters.class.getField(propertyName);</span>
+<span class="nc" id="L716">                fieldOfProperty.set(parameters, value);</span>
+<span class="nc" id="L717">            } catch (NoSuchFieldException e) {</span>
+                // ignore
+<span class="nc" id="L719">            } catch (IllegalAccessException e) {</span>
+                // ignore
+<span class="nc" id="L721">            }</span>
+<span class="nc" id="L722">        }</span>
+<span class="nc" id="L723">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

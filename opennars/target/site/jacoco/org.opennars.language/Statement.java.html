@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Statement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.language</a> &gt; <span class="el_source">Statement.java</span></div><h1>Statement.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.language;
+
+import org.opennars.inference.TemporalRules;
+import org.opennars.io.Symbols.NativeOperator;
+import org.opennars.main.Debug;
+
+import java.nio.CharBuffer;
+import java.util.Arrays;
+
+import static org.opennars.io.Symbols.NativeOperator.STATEMENT_CLOSER;
+import static org.opennars.io.Symbols.NativeOperator.STATEMENT_OPENER;
+
+/**
+ * A statement is a compound term as defined in the NARS-theory, consisting of a subject, a predicate, and a
+ * relation symbol in between. It can be of either first-order or higher-order.
+ *
+ * @author Pei Wang
+ * @author Patrick Hammer
+ */
+public abstract class Statement extends CompoundTerm {
+    
+    /**
+     * Constructor with partial values, called by make
+     * Subclass constructors should call init after any initialization
+     * 
+     * @param arg The component list of the term
+     */
+    protected Statement(final Term[] arg) {
+<span class="fc" id="L52">        super(arg);</span>
+<span class="fc" id="L53">    }</span>
+    
+
+    @Override
+    protected void init(final Term[] t) {
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (t.length!=2)</span>
+<span class="nc" id="L59">            throw new IllegalStateException(&quot;Requires 2 terms: &quot; + Arrays.toString(t));</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (t[0]==null)</span>
+<span class="nc" id="L61">            throw new IllegalStateException(&quot;Null subject: &quot; + this);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (t[1]==null)</span>
+<span class="nc" id="L63">            throw new IllegalStateException(&quot;Null predicate: &quot; + this);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (Debug.DETAILED) {                </span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            if (isCommutative()) {</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                if (t[0].compareTo(t[1])==1) {</span>
+<span class="nc" id="L67">                    throw new IllegalStateException(&quot;Commutative term requires natural order of subject,predicate: &quot; + Arrays.toString(t));</span>
+                }
+            }
+        }
+<span class="fc" id="L71">        super.init(t);</span>
+<span class="fc" id="L72">    }</span>
+    
+   
+    /**
+     * Make a Statement from given components, called by the rules
+     * @return The Statement built
+     * @param subj The first component
+     * @param pred The second component
+     * @param statement A sample statement providing the class type
+     */
+    public static Statement make(final Statement statement, final Term subj, final Term pred) {        
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (statement instanceof Inheritance) {</span>
+<span class="nc" id="L84">            return Inheritance.make(subj, pred);</span>
+        }
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (statement instanceof Similarity) {</span>
+<span class="nc" id="L87">            return Similarity.make(subj, pred);</span>
+        }
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (statement instanceof Implication) {</span>
+<span class="nc" id="L90">            return Implication.make(subj, pred, statement.getTemporalOrder());</span>
+        }
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (statement instanceof Equivalence) {</span>
+<span class="nc" id="L93">            return Equivalence.make(subj, pred, statement.getTemporalOrder());</span>
+        }
+<span class="nc" id="L95">        return null;</span>
+    }
+    
+    /**
+     * Make a Statement from String, called by StringParser
+     *
+     * @param o The relation String
+     * @param subject The first component
+     * @param predicate The second component
+     * @return The Statement built
+     */
+    final public static Statement make(final NativeOperator o, final Term subject, final Term predicate, final boolean customOrder, final int order) {
+        
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if(Terms.equalSubTermsInRespectToImageAndProduct(subject, predicate)) {</span>
+<span class="fc" id="L109">            return null;</span>
+        }
+        
+<span class="pc bpc" id="L112" title="1 of 13 branches missed.">        switch (o) {</span>
+            case INHERITANCE:
+<span class="fc" id="L114">                return Inheritance.make(subject, predicate);</span>
+            case SIMILARITY:
+<span class="fc" id="L116">                return Similarity.make(subject, predicate);</span>
+            case INSTANCE:
+<span class="fc" id="L118">                return Instance.make(subject, predicate);</span>
+            case PROPERTY:
+<span class="fc" id="L120">                return Property.make(subject, predicate);</span>
+            case INSTANCE_PROPERTY:
+<span class="fc" id="L122">                return InstanceProperty.make(subject, predicate);</span>
+            case IMPLICATION:
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                return Implication.make(subject, predicate, customOrder ? order : TemporalRules.ORDER_NONE);</span>
+            case IMPLICATION_AFTER:
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                return Implication.make(subject, predicate, customOrder ? order : TemporalRules.ORDER_FORWARD);</span>
+            case IMPLICATION_BEFORE:
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                return Implication.make(subject, predicate, customOrder ? order : TemporalRules.ORDER_BACKWARD);</span>
+            case IMPLICATION_WHEN:
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                return Implication.make(subject, predicate, customOrder ? order : TemporalRules.ORDER_CONCURRENT);</span>
+            case EQUIVALENCE:
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                return Equivalence.make(subject, predicate, customOrder ? order : TemporalRules.ORDER_NONE);</span>
+            case EQUIVALENCE_AFTER:
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">                return Equivalence.make(subject, predicate, customOrder ? order : TemporalRules.ORDER_FORWARD);</span>
+            case EQUIVALENCE_WHEN:
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                return Equivalence.make(subject, predicate, customOrder ? order : TemporalRules.ORDER_CONCURRENT);            </span>
+        }
+        
+<span class="nc" id="L139">        return null;</span>
+    }
+
+    /**
+     * Make a Statement from given term, called by the rules
+     *
+     * @param order The temporal order of the statement
+     * @return The Statement built
+     * @param subj The first component
+     * @param pred The second component
+     */
+    final public static Statement make(final NativeOperator op, final Term subj, final Term pred, final int order) {
+
+<span class="fc" id="L152">        return make(op, subj, pred, true, order);</span>
+    }
+    
+    final public static Statement make(final Statement statement, final Term subj, final Term pred, final int order) {
+
+<span class="fc" id="L157">        return make(statement.operator(), subj, pred, true, order);</span>
+    }
+
+    /**
+     * Make a symmetric Statement from given term and temporal
+ information, called by the rules
+     *
+     * @param statement A sample asymmetric statement providing the class type
+     * @param subj The first component
+     * @param pred The second component
+     * @param order The temporal order
+     * @return The Statement built
+     */
+    final public static Statement makeSym(final Statement statement, final Term subj, final Term pred, final int order) {
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (statement instanceof Inheritance) {</span>
+<span class="fc" id="L172">            return Similarity.make(subj, pred);</span>
+        }
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (statement instanceof Implication) {</span>
+<span class="fc" id="L175">            return Equivalence.make(subj, pred, order);</span>
+        }
+<span class="nc" id="L177">        return null;</span>
+    }
+
+
+
+    /**
+     * Override the default in making the nameStr of the current term from
+     * existing fields
+     *
+     * @return the nameStr of the term
+     */
+    @Override
+    protected CharSequence makeName() {
+<span class="fc" id="L190">        return makeStatementName(getSubject(), operator(), getPredicate());</span>
+    }
+    
+    final protected static CharSequence makeStatementName(final Term subject, final NativeOperator relation, final Term predicate) {
+<span class="fc" id="L194">        final CharSequence subjectName = subject.name();</span>
+<span class="fc" id="L195">        final CharSequence predicateName = predicate.name();</span>
+<span class="fc" id="L196">        final int length = subjectName.length() + predicateName.length() + relation.toString().length() + 4;</span>
+        
+<span class="fc" id="L198">        final CharBuffer cb = CharBuffer.allocate(length);</span>
+        
+<span class="fc" id="L200">        cb.append(STATEMENT_OPENER.ch);</span>
+        
+        //Texts.append(cb, subjectName);
+<span class="fc" id="L203">        cb.append(subjectName);</span>
+                
+<span class="fc" id="L205">        cb.append(' ').append(relation.toString()).append(' ');</span>
+        
+        //Texts.append(cb, predicateName);
+<span class="fc" id="L208">        cb.append(predicateName);</span>
+                
+<span class="fc" id="L210">        cb.append(STATEMENT_CLOSER.ch);</span>
+                        
+<span class="fc" id="L212">        return cb.compact().toString();</span>
+    }    
+    /**
+     * Check the validity of a potential Statement. [To be refined]
+     * &lt;p&gt;
+     * @param subject The first component
+     * @param predicate The second component
+     * @return Whether The Statement is invalid
+     */
+    final public static boolean invalidStatement(final Term subject, final Term predicate, final boolean checkSameTermInPredicateAndSubject) {
+<span class="pc bpc" id="L222" title="2 of 4 branches missed.">        if (subject==null || predicate==null)</span>
+<span class="nc" id="L223">            return true;</span>
+        
+<span class="fc bfc" id="L225" title="All 4 branches covered.">        if (checkSameTermInPredicateAndSubject &amp;&amp; subject.equals(predicate)) {</span>
+<span class="fc" id="L226">            return true;</span>
+        }        
+<span class="fc bfc" id="L228" title="All 4 branches covered.">        if (checkSameTermInPredicateAndSubject &amp;&amp; invalidReflexive(subject, predicate)) {</span>
+<span class="fc" id="L229">            return true;</span>
+        }
+<span class="fc bfc" id="L231" title="All 4 branches covered.">        if (checkSameTermInPredicateAndSubject &amp;&amp; invalidReflexive(predicate, subject)) {</span>
+<span class="fc" id="L232">            return true;</span>
+        }
+<span class="fc bfc" id="L234" title="All 4 branches covered.">        if ((subject instanceof Statement) &amp;&amp; (predicate instanceof Statement)) {</span>
+<span class="fc" id="L235">            final Statement s1 = (Statement) subject;</span>
+<span class="fc" id="L236">            final Statement s2 = (Statement) predicate;</span>
+<span class="fc" id="L237">            final Term t11 = s1.getSubject();</span>
+<span class="fc" id="L238">            final Term t22 = s2.getPredicate();</span>
+<span class="fc" id="L239">            final Term t12 = s1.getPredicate();</span>
+<span class="fc" id="L240">            final Term t21 = s2.getSubject();</span>
+<span class="fc bfc" id="L241" title="All 4 branches covered.">            return t11.equals(t22) &amp;&amp; t12.equals(t21);</span>
+        }
+<span class="fc" id="L243">        return false;</span>
+    }
+    
+    final public static boolean invalidStatement(final Term subject, final Term predicate) {
+<span class="fc" id="L247">        return invalidStatement(subject, predicate, true);</span>
+    }
+
+    /**
+     * Check if one term is identical to or included in another one, except in a
+     * reflexive relation
+     * &lt;p&gt;
+     * @param t1 The first term
+     * @param t2 The second term
+     * @return Whether they cannot be related in a statement
+     */
+    private static boolean invalidReflexive(final Term t1, final Term t2) {
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (!(t1 instanceof CompoundTerm)) {</span>
+<span class="fc" id="L260">            return false;</span>
+        }
+<span class="fc" id="L262">        final CompoundTerm ct1 = (CompoundTerm) t1;</span>
+<span class="fc bfc" id="L263" title="All 4 branches covered.">        if ((ct1 instanceof ImageExt) || (ct1 instanceof ImageInt)) {</span>
+<span class="fc" id="L264">            return false;</span>
+        }
+<span class="fc" id="L266">        return ct1.containsTerm(t2);</span>
+    }
+
+   
+    public static boolean invalidPair(final Term s1, final Term s2) {
+<span class="fc" id="L271">        final boolean s1Indep = s1.hasVarIndep();</span>
+<span class="fc" id="L272">        final boolean s2Indep = s2.hasVarIndep();</span>
+<span class="fc bfc" id="L273" title="All 4 branches covered.">        if (s1Indep &amp;&amp; !s2Indep) {</span>
+<span class="fc" id="L274">            return true;</span>
+<span class="fc bfc" id="L275" title="All 4 branches covered.">        } else return !s1Indep &amp;&amp; s2Indep;</span>
+    }
+    
+
+    /**
+     * Check the validity of a potential Statement. [To be refined]
+     * &lt;p&gt;
+     * Minimum requirement: the two terms cannot be the same, or containing each
+     * other as component
+     *
+     * @return Whether The Statement is invalid
+     */
+    public boolean invalid() {
+<span class="fc" id="L288">        return invalidStatement(getSubject(), getPredicate());</span>
+    }
+    
+ 
+    /**
+     * Return the first component of the statement
+     *
+     * @return The first component
+     */
+    public Term getSubject() {
+<span class="fc" id="L298">        return term[0];</span>
+    }
+
+    /**
+     * Return the second component of the statement
+     *
+     * @return The second component
+     */
+    public Term getPredicate() {
+<span class="fc" id="L307">        return term[1];</span>
+    }
+
+    /**
+     * returns the subject (0) or predicate(1)
+     * @param side subject(0) or predicate(1)
+     * @return the term of the side
+     */
+    public Term retBySide(final EnumStatementSide side) {
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        return side == EnumStatementSide.SUBJECT ? getSubject() : getPredicate();</span>
+    }
+
+    public static EnumStatementSide retOppositeSide(final EnumStatementSide side) {
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        return side == EnumStatementSide.SUBJECT ? EnumStatementSide.PREDICATE : EnumStatementSide.SUBJECT;</span>
+    }
+
+<span class="fc" id="L323">    public enum EnumStatementSide {</span>
+<span class="fc" id="L324">        SUBJECT,</span>
+<span class="fc" id="L325">        PREDICATE,</span>
+    }
+
+    @Override public abstract Statement clone();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

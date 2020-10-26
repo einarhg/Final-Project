@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Counting.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.plugin.mental</a> &gt; <span class="el_source">Counting.java</span></div><h1>Counting.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.plugin.mental;
+
+import org.opennars.entity.*;
+import org.opennars.io.Symbols;
+import org.opennars.io.events.EventEmitter.EventObserver;
+import org.opennars.io.events.Events;
+import org.opennars.language.Inheritance;
+import org.opennars.language.Product;
+import org.opennars.language.SetExt;
+import org.opennars.language.Term;
+import org.opennars.main.Nar;
+import org.opennars.plugin.Plugin;
+import org.opennars.storage.Memory;
+
+/**
+ * Counting and Cardinality
+ */
+public class Counting implements Plugin {
+
+    public EventObserver obs;
+    
+<span class="nc" id="L45">    final static Term CARDINALITY = Term.get(&quot;CARDINALITY&quot;);</span>
+<span class="nc" id="L46">    public volatile float MINIMUM_PRIORITY=0.3f;</span>
+    public void setMINIMUM_PRIORITY(double val) {
+<span class="nc" id="L48">        this.MINIMUM_PRIORITY = (float) val;</span>
+<span class="nc" id="L49">    }</span>
+    public double getMINIMUM_PRIORITY() {
+<span class="nc" id="L51">        return MINIMUM_PRIORITY;</span>
+    }
+    
+<span class="nc" id="L54">    public Counting(){}</span>
+<span class="nc" id="L55">    public Counting(float MINIMUM_PRIORITY) {</span>
+<span class="nc" id="L56">        this.MINIMUM_PRIORITY = MINIMUM_PRIORITY;</span>
+<span class="nc" id="L57">    }</span>
+    
+    @Override public boolean setEnabled(final Nar n, final boolean enabled) {
+<span class="nc" id="L60">        final Memory memory = n.memory;</span>
+        
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if(obs==null) {</span>
+<span class="nc" id="L63">            obs= (event, a) -&gt; {</span>
+
+<span class="nc bnc" id="L65" title="All 4 branches missed.">                if ((event!=Events.TaskDerive.class &amp;&amp; event!=Events.TaskAdd.class))</span>
+<span class="nc" id="L66">                    return;</span>
+
+<span class="nc" id="L68">                final Task task = (Task)a[0];</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                if(task.getPriority() &lt; MINIMUM_PRIORITY) {</span>
+<span class="nc" id="L70">                    return;</span>
+                }
+
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                if(task.sentence.punctuation==Symbols.JUDGMENT_MARK) {</span>
+                    //lets say we have &lt;{...} --&gt; M&gt;.
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                    if(task.sentence.term instanceof Inheritance) {</span>
+
+<span class="nc" id="L77">                        final Inheritance inh=(Inheritance) task.sentence.term;</span>
+
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                        if(inh.getSubject() instanceof SetExt) {</span>
+
+<span class="nc" id="L81">                            final SetExt set_term=(SetExt) inh.getSubject();</span>
+
+                            //this gets the cardinality of M
+<span class="nc" id="L84">                            final int cardinality=set_term.size();</span>
+
+                            //now create term &lt;(*,M,cardinality) --&gt; CARDINALITY&gt;.
+<span class="nc" id="L87">                            final Term[] product_args = new Term[] {</span>
+<span class="nc" id="L88">                                inh.getPredicate(),</span>
+<span class="nc" id="L89">                                Term.get(cardinality)</span>
+                            };
+
+                            //TODO CARDINATLITY can be a static final instance shared by all
+<span class="nc" id="L93">                            final Term new_term=Inheritance.make(new Product(product_args), /* --&gt; */ CARDINALITY);</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                            if (new_term == null) {</span>
+                                //this usually happens when product_args contains the term CARDINALITY in which case it is an invalid Inheritance statement
+<span class="nc" id="L96">                                return;</span>
+                            }
+
+<span class="nc" id="L99">                            final TruthValue truth = task.sentence.truth.clone();</span>
+<span class="nc" id="L100">                            final Stamp stampi = task.sentence.stamp.clone();</span>
+<span class="nc" id="L101">                            final Sentence j = new Sentence(</span>
+                                new_term,
+                                Symbols.JUDGMENT_MARK,
+                                truth,
+                                stampi);
+<span class="nc" id="L106">                            final BudgetValue budg = task.budget.clone();</span>
+
+<span class="nc" id="L108">                            final Task newTask = new Task(j, budg, Task.EnumType.INPUT);</span>
+
+<span class="nc" id="L110">                            memory.addNewTask(newTask, &quot;Derived (Cardinality)&quot;);</span>
+                        }
+                    }
+                }
+<span class="nc" id="L114">            };</span>
+        }
+        
+<span class="nc" id="L117">        memory.event.set(obs, enabled, Events.TaskDerive.class);</span>
+<span class="nc" id="L118">        return true;</span>
+    }
+    
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

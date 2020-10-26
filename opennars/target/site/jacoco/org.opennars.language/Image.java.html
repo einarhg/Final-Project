@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Image.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.language</a> &gt; <span class="el_source">Image.java</span></div><h1>Image.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.language;
+
+import org.opennars.io.Symbols;
+import org.opennars.io.Symbols.NativeOperator;
+
+import java.util.Objects;
+
+import static org.opennars.io.Symbols.NativeOperator.COMPOUND_TERM_CLOSER;
+import static org.opennars.io.Symbols.NativeOperator.COMPOUND_TERM_OPENER;
+
+/**
+ * Generalization of Images as defined in the NARS-theory
+ *
+ */
+abstract public class Image extends CompoundTerm {
+    /** The index of relation in the component list */
+    public final short relationIndex;
+
+    protected Image(final Term[] components, final short relationIndex) {
+<span class="fc" id="L43">        super(components);</span>
+        
+<span class="fc" id="L45">        this.relationIndex = relationIndex;</span>
+                
+<span class="fc" id="L47">        init(components);</span>
+<span class="fc" id="L48">    }</span>
+
+    @Override
+    protected void init(final Term[] components) {
+<span class="fc" id="L52">        super.init(components);</span>
+<span class="fc" id="L53">        this.hash = Objects.hash(super.hashCode(), relationIndex); </span>
+<span class="fc" id="L54">    }</span>
+    
+    @Override
+    public int compareTo(final AbstractTerm that) {
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (that instanceof Image) {</span>
+<span class="fc" id="L59">            final int r = relationIndex - ((Image)that).relationIndex;</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            if (r!=0)</span>
+<span class="fc" id="L61">                return r;            </span>
+        }
+<span class="fc" id="L63">        return super.compareTo(that);</span>
+    }
+
+    //TODO replace with a special Term type
+    public static boolean isPlaceHolder(final Term t) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (t.getClass() != Term.class) return false;</span>
+<span class="fc" id="L69">        final CharSequence n = t.name();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (n.length() != 1) return false;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        return n.charAt(0) == Symbols.IMAGE_PLACE_HOLDER;</span>
+    }    
+    
+   /**
+     * default method to make the oldName of an image term from given fields
+     *
+     * @param op the term operator
+     * @param arg the list of term
+     * @param relationIndex the location of the place holder
+     * @return the oldName of the term
+     */
+    protected static String makeImageName(final NativeOperator op, final Term[] arg, final int relationIndex) {
+<span class="fc" id="L83">        final int sizeEstimate = 12 * arg.length + 2;</span>
+        
+<span class="fc" id="L85">        final StringBuilder name = new StringBuilder(sizeEstimate)</span>
+<span class="fc" id="L86">            .append(COMPOUND_TERM_OPENER.ch)</span>
+<span class="fc" id="L87">            .append(op)</span>
+<span class="fc" id="L88">            .append(Symbols.ARGUMENT_SEPARATOR)</span>
+<span class="fc" id="L89">            .append(arg[relationIndex].name());</span>
+        
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (int i = 0; i &lt; arg.length; i++) {</span>
+<span class="fc" id="L92">            name.append(Symbols.ARGUMENT_SEPARATOR);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (i == relationIndex) {</span>
+<span class="fc" id="L94">                name.append(Symbols.IMAGE_PLACE_HOLDER);                </span>
+            } else {
+<span class="fc" id="L96">                name.append(arg[i].name());</span>
+            }
+        }
+<span class="fc" id="L99">        name.append(COMPOUND_TERM_CLOSER.ch);</span>
+<span class="fc" id="L100">        return name.toString();</span>
+    }    
+    
+    /**
+     * Get the other term in the Image
+     * @return The term relaterom existing fields
+     * @return the name of the term
+     */
+    @Override
+    public CharSequence makeName() {
+<span class="fc" id="L110">        return makeImageName(operator(), term, relationIndex);</span>
+    }
+
+    /**
+     * Get the relation term in the Image
+     * @return The term representing a relation
+     */
+    public Term getRelation() {
+<span class="nc" id="L118">        return term[relationIndex];</span>
+    }
+
+    /**
+     * Get the other term in the Image
+     * @return The term related
+     */
+    public Term getTheOtherComponent() {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (term.length != 2) {</span>
+<span class="nc" id="L127">            return null;</span>
+        }
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        return (relationIndex == 0) ? term[1] : term[0];</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

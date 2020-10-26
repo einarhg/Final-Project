@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProcessJudgment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.control.concept</a> &gt; <span class="el_source">ProcessJudgment.java</span></div><h1>ProcessJudgment.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.control.concept;
+
+import com.google.common.base.Optional;
+import org.opennars.control.DerivationContext;
+import org.opennars.control.TemporalInferenceControl;
+import org.opennars.entity.Concept;
+import org.opennars.entity.Sentence;
+import org.opennars.entity.Stamp;
+import org.opennars.entity.Task;
+
+import static com.google.common.collect.Iterables.tryFind;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import static org.opennars.inference.LocalRules.revisible;
+import static org.opennars.inference.LocalRules.revision;
+import static org.opennars.inference.LocalRules.trySolution;
+
+import org.opennars.inference.TemporalRules;
+import org.opennars.io.events.Events;
+import org.opennars.language.CompoundTerm;
+import org.opennars.language.Conjunction;
+import org.opennars.language.Implication;
+import org.opennars.language.Interval;
+import org.opennars.language.Term;
+import org.opennars.operator.Operation;
+import org.opennars.operator.Operator;
+import org.opennars.operator.mental.Anticipate;
+import org.opennars.operator.mental.Believe;
+import org.opennars.operator.mental.Evaluate;
+import org.opennars.operator.mental.Want;
+import org.opennars.operator.mental.Wonder;
+
+<span class="nc" id="L58">public class ProcessJudgment {</span>
+    /**
+     * To accept a new judgment as belief, and check for revisions and solutions.
+     * Revisions will be processed as judgment tasks by themselves.
+     * Due to their higher confidence, summarizing more evidence,
+     * the will become the top entries in the belief table.
+     * Additionally, judgements can themselves be the solution to existing questions
+     * and goals, which is also processed here.
+     * 
+     * @param task The judgment task to be accepted
+     * @param concept The concept of the judment task
+     * @param nal The derivation context
+     */
+    public static void processJudgment(final Concept concept, final DerivationContext nal, final Task task) {
+<span class="fc" id="L72">        handleOperationFeedback(task, nal);</span>
+<span class="fc" id="L73">        final Sentence judg = task.sentence;</span>
+<span class="fc" id="L74">        ProcessAnticipation.confirmAnticipation(task, concept, nal);</span>
+<span class="fc" id="L75">        final Task oldBeliefT = concept.selectCandidate(task, concept.beliefs, nal.time);   // only revise with the strongest -- how about projection?</span>
+<span class="fc" id="L76">        Sentence oldBelief = null;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (oldBeliefT != null) {</span>
+<span class="fc" id="L78">            oldBelief = oldBeliefT.sentence;</span>
+<span class="fc" id="L79">            final Stamp newStamp = judg.stamp;</span>
+<span class="fc" id="L80">            final Stamp oldStamp = oldBelief.stamp;       //when table is full, the latter check is especially important too</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (newStamp.equals(oldStamp,false,false,true)) {</span>
+<span class="fc" id="L82">                concept.memory.removeTask(task, &quot;Duplicated&quot;);</span>
+<span class="fc" id="L83">                return;</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            } else if (revisible(judg, oldBelief, nal.narParameters)) {</span>
+<span class="fc" id="L85">                nal.setTheNewStamp(newStamp, oldStamp, nal.time.time());</span>
+<span class="fc" id="L86">                final Sentence projectedBelief = oldBelief.projection(nal.time.time(), newStamp.getOccurrenceTime(), concept.memory);</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                if (projectedBelief!=null) {</span>
+<span class="fc" id="L88">                    nal.setCurrentBelief(projectedBelief);</span>
+<span class="fc" id="L89">                    revision(judg, projectedBelief, concept, false, nal);</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (!task.aboveThreshold()) {</span>
+<span class="fc" id="L94">            return;</span>
+        }
+<span class="fc" id="L96">        final int nnq = concept.questions.size();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (int i = 0; i &lt; nnq; i++) {</span>
+<span class="fc" id="L98">            trySolution(judg, concept.questions.get(i), nal, true);</span>
+        }
+<span class="fc" id="L100">        final int nng = concept.desires.size();</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (int i = 0; i &lt; nng; i++) {</span>
+<span class="fc" id="L102">            trySolution(judg, concept.desires.get(i), nal, true);</span>
+        }
+<span class="fc" id="L104">        concept.addToTable(task, false, concept.beliefs, concept.memory.narParameters.CONCEPT_BELIEFS_MAX, Events.ConceptBeliefAdd.class, Events.ConceptBeliefRemove.class);</span>
+<span class="fc" id="L105">    }</span>
+
+    /**
+     * Handle the feedback of the operation that was processed as a judgment.
+     * &lt;br&gt;
+     * The purpose is to start a new operation frame which makes the operation concept 
+     * interpret current events as preconditions and future events as post-conditions to the invoked operation.
+     * 
+     * @param task The judgement task be checked
+     * @param nal The derivation context
+     */
+    public static void handleOperationFeedback(Task task, DerivationContext nal) {
+<span class="fc bfc" id="L117" title="All 6 branches covered.">        if(task.isInput() &amp;&amp; !task.sentence.isEternal() &amp;&amp; task.sentence.term instanceof Operation) {</span>
+<span class="fc" id="L118">            final Operation op = (Operation) task.sentence.term;</span>
+<span class="fc" id="L119">            final Operator o = (Operator) op.getPredicate();</span>
+            //only consider these mental ops an operation to track when executed not already when generated as internal event
+<span class="fc bfc" id="L121" title="All 10 branches covered.">            if(!(o instanceof Believe) &amp;&amp; !(o instanceof Want) &amp;&amp; !(o instanceof Wonder)</span>
+                    &amp;&amp; !(o instanceof Evaluate) &amp;&amp; !(o instanceof Anticipate)) {
+<span class="fc" id="L123">                TemporalInferenceControl.NewOperationFrame(nal.memory, task);</span>
+            }
+        }
+<span class="fc" id="L126">    }</span>
+    
+    /**
+     * Check whether the task is an executable hypothesis of the form
+     * &amp;lt;(&amp;amp;/,a,op()) =/&amp;gt; b&amp;gt;.
+     * 
+     * @param task The judgement task be checked
+     * @param nal The derivation context
+     * @return Whether task is an executable precondition
+     */
+    protected static boolean isExecutableHypothesis(Task task, final DerivationContext nal) {
+<span class="fc" id="L137">        final Term term = task.getTerm();</span>
+<span class="fc bfc" id="L138" title="All 4 branches covered.">        if(!task.sentence.isEternal() ||</span>
+           !(term instanceof Implication))
+        {
+<span class="fc" id="L141">            return false;</span>
+        }
+<span class="fc" id="L143">        final Implication imp = (Implication) term;</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if(imp.getTemporalOrder() != TemporalRules.ORDER_FORWARD) {</span>
+<span class="fc" id="L145">            return false;</span>
+        }
+        //also it has to be enactable, meaning the last entry of the sequence before the interval is an operation:
+<span class="fc" id="L148">        final Term subj = imp.getSubject();</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (!(subj instanceof Conjunction)) {</span>
+<span class="fc" id="L150">            return false;</span>
+        }
+<span class="fc" id="L152">        final Conjunction conj = (Conjunction) subj;</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        boolean isInExecutableFormat = !conj.isSpatial &amp;&amp; </span>
+<span class="fc bfc" id="L154" title="All 10 branches covered.">                                        conj.getTemporalOrder() == TemporalRules.ORDER_FORWARD &amp;&amp;</span>
+                                        conj.term.length &gt;= 4 &amp;&amp; conj.term.length%2 == 0 &amp;&amp;
+                                        conj.term[conj.term.length-1] instanceof Interval &amp;&amp;
+                                        conj.term[conj.term.length-2] instanceof Operation;
+<span class="fc" id="L158">        return isInExecutableFormat;</span>
+    }
+    
+    /**
+     * Add &amp;lt;(&amp;amp;/,a,op()) =/&amp;gt; b&amp;gt; beliefs to preconditions in concept b
+     * 
+     * @param task The potential implication task
+     * @param nal The derivation context
+     */
+    protected static void addToTargetConceptsPreconditions(final Task task, final DerivationContext nal) {
+<span class="fc" id="L168">        Set&lt;Term&gt; targets = new LinkedHashSet&lt;&gt;();</span>
+        //add to all components, unless it doesn't have vars
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if(!((Implication)task.getTerm()).getPredicate().hasVar()) {</span>
+<span class="fc" id="L171">            targets.add(((Implication)task.getTerm()).getPredicate());</span>
+        } else {
+<span class="fc" id="L173">            Map&lt;Term, Integer&gt; ret = ((Implication)task.getTerm()).getPredicate().countTermRecursively(null);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            for(Term r : ret.keySet()) {</span>
+<span class="fc" id="L175">                targets.add(r);</span>
+<span class="fc" id="L176">            }</span>
+        }
+        //the concept of the implication task
+<span class="fc" id="L179">        Concept origin_concept = nal.memory.concept(task.getTerm());</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if(origin_concept == null) {</span>
+<span class="fc" id="L181">            return;</span>
+        }
+        //get the first eternal. the highest confident one (due to the sorted order):
+<span class="fc" id="L184">        Optional&lt;Task&gt; strongest_target = null;</span>
+<span class="fc" id="L185">        synchronized(origin_concept) {</span>
+<span class="fc" id="L186">            strongest_target = tryFind(origin_concept.beliefs, iTask -&gt; iTask.sentence.isEternal());</span>
+<span class="fc" id="L187">        }</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (!strongest_target.isPresent()) {</span>
+<span class="fc" id="L189">            return;</span>
+        }
+<span class="fc" id="L191">        final Term[] prec = ((Conjunction) ((Implication) strongest_target.get().getTerm()).getSubject()).term;</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (int i = 0; i&lt;prec.length-2; i++) {</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">            if (prec[i] instanceof Operation) { //don't react to precondition with an operation before the last</span>
+<span class="nc" id="L194">                return; //for now, these can be decomposed into smaller such statements anyway</span>
+            }
+        }
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        for(Term t : targets) { //the target sub concepts it needs to go to</span>
+<span class="fc" id="L198">            final Concept target_concept = nal.memory.concept(t);</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            if(target_concept == null) { //target concept does not exist</span>
+<span class="fc" id="L200">                continue;</span>
+            }
+            // we do not add the target, instead the strongest belief in the target concept
+<span class="fc" id="L203">            synchronized(target_concept) {       </span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                List&lt;Task&gt; table = strongest_target.get().sentence.term.hasVar() ?  target_concept.general_executable_preconditions : </span>
+                                                                                    target_concept.executable_preconditions;
+                //at first we have to remove the last one with same content from table
+<span class="fc" id="L207">                int i_delete = -1;</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                for(int i=0; i &lt; table.size(); i++) {</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                    if(CompoundTerm.replaceIntervals(table.get(i).getTerm()).equals(</span>
+<span class="fc" id="L210">                            CompoundTerm.replaceIntervals(strongest_target.get().getTerm()))) {</span>
+<span class="fc" id="L211">                        i_delete = i; //even these with same term but different intervals are removed here</span>
+<span class="fc" id="L212">                        break;</span>
+                    }
+                }
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                if(i_delete != -1) {</span>
+<span class="fc" id="L216">                    table.remove(i_delete);</span>
+                }
+                //this way the strongest confident result of this content is put into table but the table ranked according to truth expectation
+<span class="fc" id="L219">                target_concept.addToTable(strongest_target.get(), true, table, target_concept.memory.narParameters.CONCEPT_BELIEFS_MAX, Events.EnactableExplainationAdd.class, Events.EnactableExplainationRemove.class);</span>
+<span class="fc" id="L220">            }</span>
+<span class="fc" id="L221">        }</span>
+<span class="fc" id="L222">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

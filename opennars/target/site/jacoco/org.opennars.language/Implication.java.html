@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Implication.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.language</a> &gt; <span class="el_source">Implication.java</span></div><h1>Implication.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.language;
+
+import org.opennars.inference.TemporalRules;
+import org.opennars.io.Symbols.NativeOperator;
+
+import java.util.Arrays;
+
+/**
+ * A Statement about an Inheritance copula as defined in the NARS-theory
+ *
+ * @author Pei Wang
+ * @author Patrick Hammer
+ */
+public class Implication extends Statement {
+<span class="fc" id="L38">    private int temporalOrder = TemporalRules.ORDER_NONE;</span>
+
+    // counter used for evidence tracking
+<span class="fc" id="L41">    public long counter = 1;</span>
+
+    /**
+     * Constructor with partial values, called by make
+     * @param arg The component list of the term
+     */
+    public Implication(final Term[] arg, final int order) {
+<span class="fc" id="L48">        super(arg);</span>
+
+<span class="fc" id="L50">        temporalOrder = order;</span>
+
+<span class="fc" id="L52">        init(arg);</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * Constructor with partial values, called by make
+     * @param arg The component list of the term
+     */
+    public Implication(final Term[] arg, final int order, final long counter) {
+<span class="fc" id="L60">        super(arg);</span>
+
+<span class="fc" id="L62">        temporalOrder = order;</span>
+<span class="fc" id="L63">        this.counter = counter;</span>
+
+<span class="fc" id="L65">        init(arg);</span>
+<span class="fc" id="L66">    }</span>
+
+    public Implication(final Term subject, final Term predicate, final int order) {
+<span class="nc" id="L69">        this(new Term[] { subject, predicate }, order);</span>
+<span class="nc" id="L70">    }</span>
+
+
+    
+    
+    /**
+     * Clone an object
+     * @return A new object
+     */
+    @Override
+    public Implication clone() {
+<span class="nc" id="L81">        return new Implication(term, getTemporalOrder(), counter);</span>
+    }
+    
+    @Override public Implication clone(final Term[] t) {   
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if(t == null) {</span>
+<span class="fc" id="L86">            return null;</span>
+        }
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (t.length!=2)</span>
+<span class="nc" id="L89">            throw new IllegalStateException(&quot;Implication requires 2 components: &quot; + Arrays.toString(t));</span>
+        
+<span class="fc" id="L91">        return make(t[0], t[1], temporalOrder);</span>
+    }
+    
+
+    /**
+     * Try to make a new compound from two term. Called by the inference rules.
+     * @param subject The first component
+     * @param predicate The second component
+     * @return A compound generated or a term it reduced to
+     */
+    public static Implication make(final Term subject, final Term predicate) {
+<span class="fc" id="L102">        return make(subject, predicate, TemporalRules.ORDER_NONE);</span>
+    }
+
+    public static CharSequence makeName(final Term subject, final int temporalOrder, final Term predicate) {
+        final NativeOperator copula;
+<span class="nc bnc" id="L107" title="All 4 branches missed.">        switch (temporalOrder) {</span>
+            case TemporalRules.ORDER_FORWARD:
+<span class="nc" id="L109">                copula = NativeOperator.IMPLICATION_AFTER;</span>
+<span class="nc" id="L110">                break;</span>
+            case TemporalRules.ORDER_CONCURRENT:
+<span class="nc" id="L112">                copula = NativeOperator.IMPLICATION_WHEN;</span>
+<span class="nc" id="L113">                break;</span>
+            case TemporalRules.ORDER_BACKWARD:
+<span class="nc" id="L115">                copula = NativeOperator.IMPLICATION_BEFORE;</span>
+<span class="nc" id="L116">                break;</span>
+            default:
+<span class="nc" id="L118">                copula = NativeOperator.IMPLICATION;</span>
+        }                
+<span class="nc" id="L120">        return makeStatementName(subject, copula, predicate);</span>
+    }
+    
+    public static Implication make(final Term subject, final Term predicate, final int temporalOrder) {
+<span class="fc bfc" id="L124" title="All 6 branches covered.">        if (invalidStatement(subject, predicate, temporalOrder != TemporalRules.ORDER_FORWARD &amp;&amp; temporalOrder != TemporalRules.ORDER_CONCURRENT)) {</span>
+<span class="fc" id="L125">            return null;</span>
+        }
+        
+<span class="pc bpc" id="L128" title="2 of 10 branches missed.">        if ((subject instanceof Implication) || (subject instanceof Equivalence) || (predicate instanceof Equivalence) ||</span>
+                (subject instanceof Interval) || (predicate instanceof Interval)) {
+<span class="fc" id="L130">            return null;</span>
+        }
+        
+        //final CharSequence name = makeName(subject, temporalOrder, predicate);         
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (predicate instanceof Implication) {</span>
+<span class="fc" id="L135">            final Term oldCondition = ((Statement) predicate).getSubject();</span>
+<span class="fc bfc" id="L136" title="All 4 branches covered.">            if ((oldCondition instanceof Conjunction) &amp;&amp; oldCondition.containsTerm(subject)) {</span>
+<span class="fc" id="L137">                return null;</span>
+            }
+<span class="fc" id="L139">            int order = temporalOrder;</span>
+<span class="fc" id="L140">            boolean spatial = false;</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if(subject instanceof Conjunction) {</span>
+<span class="fc" id="L142">                final Conjunction conj = (Conjunction) subject;</span>
+<span class="fc" id="L143">                order = conj.getTemporalOrder();</span>
+<span class="fc" id="L144">                spatial = conj.getIsSpatial();</span>
+            }
+<span class="fc" id="L146">            final Term newCondition = Conjunction.make(subject, oldCondition, order, spatial);</span>
+<span class="fc" id="L147">            return make(newCondition, ((Statement) predicate).getPredicate(), temporalOrder);</span>
+        } else {
+<span class="fc" id="L149">            return new Implication(new Term[] { subject, predicate }, temporalOrder);</span>
+        }
+    }
+
+    /**
+     * Get the operator of the term.
+     * @return the operator of the term
+     */
+    @Override
+    public NativeOperator operator() {
+<span class="fc bfc" id="L159" title="All 4 branches covered.">        switch (temporalOrder) {</span>
+            case TemporalRules.ORDER_FORWARD:
+<span class="fc" id="L161">                return NativeOperator.IMPLICATION_AFTER;</span>
+            case TemporalRules.ORDER_CONCURRENT:
+<span class="fc" id="L163">                return NativeOperator.IMPLICATION_WHEN;</span>
+            case TemporalRules.ORDER_BACKWARD:
+<span class="fc" id="L165">                return NativeOperator.IMPLICATION_BEFORE;</span>
+        }
+<span class="fc" id="L167">        return NativeOperator.IMPLICATION;</span>
+    }
+    
+    @Override
+    public int getTemporalOrder() {
+<span class="fc" id="L172">        return temporalOrder;</span>
+    }
+
+    public boolean isForward() {
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        return getTemporalOrder()==TemporalRules.ORDER_FORWARD;</span>
+    }
+    public boolean isBackward() {
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        return getTemporalOrder()==TemporalRules.ORDER_BACKWARD;</span>
+    }
+    public boolean isConcurrent() {
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        return getTemporalOrder()==TemporalRules.ORDER_CONCURRENT;</span>
+    }
+    
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

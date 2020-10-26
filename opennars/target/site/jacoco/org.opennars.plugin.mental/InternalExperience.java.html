@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InternalExperience.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.plugin.mental</a> &gt; <span class="el_source">InternalExperience.java</span></div><h1>InternalExperience.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.plugin.mental;
+
+import java.io.Serializable;
+import org.opennars.control.DerivationContext;
+import org.opennars.entity.*;
+import org.opennars.inference.BudgetFunctions;
+import org.opennars.inference.TemporalRules;
+import org.opennars.interfaces.Timable;
+import org.opennars.io.Symbols;
+import org.opennars.io.events.EventEmitter.EventObserver;
+import org.opennars.io.events.Events;
+import org.opennars.language.*;
+import org.opennars.main.Nar;
+import org.opennars.operator.Operation;
+import org.opennars.operator.Operator;
+import org.opennars.plugin.Plugin;
+import org.opennars.storage.Memory;
+
+import java.util.Arrays;
+
+/**
+ * To rememberAction an internal action as an operation
+ * &lt;p&gt;
+ * called from Concept
+ */
+public class InternalExperience implements Plugin, EventObserver, Serializable {
+    private Memory memory;
+
+<span class="fc" id="L52">    public static boolean enabled=false;</span>
+
+    private Nar nar;
+
+
+<span class="pc" id="L57">    public volatile float MINIMUM_PRIORITY_TO_CREATE_WANT_BELIEVE_ETC=0.3f;</span>
+<span class="pc" id="L58">    public volatile float MINIMUM_PRIORITY_TO_CREATE_WONDER_EVALUATE=0.3f;</span>
+
+    //internal experience has less durability?
+<span class="pc" id="L61">    public volatile float INTERNAL_EXPERIENCE_PROBABILITY=0.0001f;</span>
+
+    //internal experience has less durability?
+<span class="pc" id="L64">    public volatile float INTERNAL_EXPERIENCE_DURABILITY_MUL=0.1f; //0.1</span>
+
+    //internal experience has less priority?
+<span class="pc" id="L67">    public volatile float INTERNAL_EXPERIENCE_PRIORITY_MUL=0.1f; //0.1</span>
+
+
+    /** less probable form */
+<span class="pc" id="L71">    public volatile float INTERNAL_EXPERIENCE_RARE_PROBABILITY = 0.000025f;</span>
+
+    /** dont use internal experience for want and believe if this setting is true */
+<span class="pc" id="L74">    public volatile boolean ALLOW_WANT_BELIEF=true;</span>
+
+    //https://groups.google.com/forum/#!topic/open-nars/DVE5FJd7FaM
+<span class="pc" id="L77">    public volatile boolean OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY=false;</span>
+
+
+<span class="pc" id="L80">    public volatile boolean FULL_REFLECTION = false;</span>
+
+
+    public void setMINIMUM_PRIORITY_TO_CREATE_WANT_BELIEVE_ETC(double val) {
+<span class="nc" id="L84">        this.MINIMUM_PRIORITY_TO_CREATE_WANT_BELIEVE_ETC = (float) val;</span>
+<span class="nc" id="L85">    }</span>
+    public double getMINIMUM_PRIORITY_TO_CREATE_WANT_BELIEVE_ETC() {
+<span class="nc" id="L87">        return MINIMUM_PRIORITY_TO_CREATE_WANT_BELIEVE_ETC;</span>
+    }
+
+    public void setMINIMUM_PRIORITY_TO_CREATE_WONDER_EVALUATE(double val) {
+<span class="nc" id="L91">        this.MINIMUM_PRIORITY_TO_CREATE_WONDER_EVALUATE = (float) val;</span>
+<span class="nc" id="L92">    }</span>
+    public double getMINIMUM_PRIORITY_TO_CREATE_WONDER_EVALUATE() {
+<span class="nc" id="L94">        return MINIMUM_PRIORITY_TO_CREATE_WONDER_EVALUATE;</span>
+    }
+
+
+    public void setINTERNAL_EXPERIENCE_PROBABILITY(double val) {
+<span class="nc" id="L99">        this.INTERNAL_EXPERIENCE_PROBABILITY = (float) val;</span>
+<span class="nc" id="L100">    }</span>
+    public double getINTERNAL_EXPERIENCE_PROBABILITY() {
+<span class="nc" id="L102">        return INTERNAL_EXPERIENCE_PROBABILITY;</span>
+    }
+
+    public void setINTERNAL_EXPERIENCE_RARE_PROBABILITY(double val) {
+<span class="nc" id="L106">        this.INTERNAL_EXPERIENCE_RARE_PROBABILITY = (float) val;</span>
+<span class="nc" id="L107">    }</span>
+    public double getINTERNAL_EXPERIENCE_RARE_PROBABILITY() {
+<span class="nc" id="L109">        return INTERNAL_EXPERIENCE_RARE_PROBABILITY;</span>
+    }
+
+    public void setINTERNAL_EXPERIENCE_DURABILITY_MUL(double val) {
+<span class="nc" id="L113">        this.INTERNAL_EXPERIENCE_DURABILITY_MUL = (float) val;</span>
+<span class="nc" id="L114">    }</span>
+    public double getINTERNAL_EXPERIENCE_DURABILITY_MUL() {
+<span class="nc" id="L116">        return INTERNAL_EXPERIENCE_DURABILITY_MUL;</span>
+    }
+
+    public void setINTERNAL_EXPERIENCE_PRIORITY_MUL(double val) {
+<span class="nc" id="L120">        this.INTERNAL_EXPERIENCE_PRIORITY_MUL = (float) val;</span>
+<span class="nc" id="L121">    }</span>
+    public double getINTERNAL_EXPERIENCE_PRIORITY_MUL() {
+<span class="nc" id="L123">        return INTERNAL_EXPERIENCE_PRIORITY_MUL;</span>
+    }
+    
+
+    public boolean isALLOW_WANT_BELIEF() {
+<span class="nc" id="L128">        return ALLOW_WANT_BELIEF;</span>
+    }
+    public void setALLOW_WANT_BELIEF(final boolean val) {
+<span class="nc" id="L131">        ALLOW_WANT_BELIEF=val;</span>
+<span class="nc" id="L132">    }</span>
+
+    public boolean isOLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY() {
+<span class="nc" id="L135">        return OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY;</span>
+    }
+    public void setOLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY(final boolean val) {
+<span class="nc" id="L138">        OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY=val;</span>
+<span class="nc" id="L139">    }</span>
+
+
+    public boolean isFULL_REFLECTION() {
+<span class="nc" id="L143">        return FULL_REFLECTION;</span>
+    }
+    public void setFULL_REFLECTION(final boolean val) {
+<span class="nc" id="L146">        FULL_REFLECTION=val;</span>
+<span class="nc" id="L147">    }</span>
+<span class="nc" id="L148">    public InternalExperience() {}</span>
+    public InternalExperience(float MINIMUM_PRIORITY_TO_CREATE_WANT_BELIEVE_ETC,
+            float MINIMUM_PRIORITY_TO_CREATE_WONDER_EVALUATE,
+            float INTERNAL_EXPERIENCE_PROBABILITY,
+            float INTERNAL_EXPERIENCE_RARE_PROBABILITY,
+            float INTERNAL_EXPERIENCE_DURABILITY_MUL,
+            float INTERNAL_EXPERIENCE_PRIORITY_MUL,
+            boolean ALLOW_WANT_BELIEF,
+            boolean OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY,
+<span class="fc" id="L157">            boolean FULL_REFLECTION) {</span>
+<span class="fc" id="L158">        this.MINIMUM_PRIORITY_TO_CREATE_WANT_BELIEVE_ETC = MINIMUM_PRIORITY_TO_CREATE_WANT_BELIEVE_ETC;</span>
+<span class="fc" id="L159">        this.MINIMUM_PRIORITY_TO_CREATE_WONDER_EVALUATE = MINIMUM_PRIORITY_TO_CREATE_WONDER_EVALUATE;</span>
+<span class="fc" id="L160">        this.INTERNAL_EXPERIENCE_PROBABILITY = INTERNAL_EXPERIENCE_PROBABILITY;</span>
+<span class="fc" id="L161">        this.INTERNAL_EXPERIENCE_RARE_PROBABILITY = INTERNAL_EXPERIENCE_RARE_PROBABILITY;</span>
+<span class="fc" id="L162">        this.INTERNAL_EXPERIENCE_DURABILITY_MUL = INTERNAL_EXPERIENCE_DURABILITY_MUL;</span>
+<span class="fc" id="L163">        this.INTERNAL_EXPERIENCE_PRIORITY_MUL = INTERNAL_EXPERIENCE_PRIORITY_MUL;</span>
+<span class="fc" id="L164">        this.ALLOW_WANT_BELIEF = ALLOW_WANT_BELIEF;</span>
+<span class="fc" id="L165">        this.OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY = OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY;</span>
+<span class="fc" id="L166">        this.FULL_REFLECTION = FULL_REFLECTION;</span>
+<span class="fc" id="L167">    }</span>
+    @Override public boolean setEnabled(final Nar n, final boolean enable) {
+<span class="fc" id="L169">        memory = n.memory;</span>
+<span class="fc" id="L170">        this.nar = n;</span>
+        
+<span class="fc" id="L172">        memory.event.set(this, enable, Events.ConceptDirectProcessedTask.class);</span>
+        
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (FULL_REFLECTION)</span>
+<span class="nc" id="L175">            memory.event.set(this, enable, Events.BeliefReason.class);</span>
+        
+<span class="fc" id="L177">        enabled=enable;</span>
+        
+<span class="fc" id="L179">        return true;</span>
+    }
+    
+        public static Term toTerm(final Sentence s, final Memory mem, final Timable time) {
+        final String opName;
+<span class="pc bpc" id="L184" title="1 of 5 branches missed.">        switch (s.punctuation) {</span>
+            case Symbols.JUDGMENT_MARK:
+<span class="fc" id="L186">                opName = &quot;^believe&quot;;</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">                if(!mem.internalExperience.ALLOW_WANT_BELIEF) {</span>
+<span class="nc" id="L188">                    return null;</span>
+                }
+                break;
+            case Symbols.GOAL_MARK:
+<span class="fc" id="L192">                opName = &quot;^want&quot;;</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                if(!mem.internalExperience.ALLOW_WANT_BELIEF) {</span>
+<span class="nc" id="L194">                    return null;</span>
+                }
+                break;
+            case Symbols.QUESTION_MARK:
+<span class="fc" id="L198">                opName = &quot;^wonder&quot;;</span>
+<span class="fc" id="L199">                break;</span>
+            case Symbols.QUEST_MARK:
+<span class="fc" id="L201">                opName = &quot;^evaluate&quot;;</span>
+<span class="fc" id="L202">                break;</span>
+            default:
+<span class="nc" id="L204">                return null;</span>
+        }
+        
+<span class="fc" id="L207">        final Term opTerm = mem.getOperator(opName);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        final Term[] arg = new Term[ s.truth==null ? 2 : 3 ];</span>
+<span class="fc" id="L209">        arg[0]=Term.SELF;</span>
+<span class="fc" id="L210">        arg[1]=s.getTerm();</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (s.truth != null) {</span>
+<span class="fc" id="L212">            arg[2] = s.projection(time.time(), time.time(), mem).truth.toWordTerm();</span>
+        }
+        
+        //Operation.make ?
+<span class="fc" id="L216">        final Term operation = Inheritance.make(new Product(arg), opTerm);</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (operation == null) {</span>
+<span class="nc" id="L218">            throw new IllegalStateException(&quot;Unable to create Inheritance: &quot; + opTerm + &quot;, &quot; + Arrays.toString(arg));</span>
+        }
+<span class="fc" id="L220">        return operation;</span>
+    }
+
+
+    @Override
+    public void event(final Class event, final Object[] a) {
+        
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (event==Events.ConceptDirectProcessedTask.class) {</span>
+<span class="fc" id="L228">            final Task task = (Task)a[0];</span>
+            
+            //old strategy always, new strategy only for QUESTION and QUEST:
+<span class="pc bpc" id="L231" title="2 of 8 branches missed.">            if(OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY || (!OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY &amp;&amp; (task.sentence.punctuation == Symbols.QUESTION_MARK || task.sentence.punctuation == Symbols.QUEST_MARK))) {</span>
+<span class="fc" id="L232">                InternalExperienceFromTaskInternal(memory,task, FULL_REFLECTION, nar);</span>
+            }
+<span class="fc" id="L234">        }</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        else if (event == Events.BeliefReason.class) {</span>
+            //belief, beliefTerm, taskTerm, nal
+<span class="nc" id="L237">            final Sentence belief = (Sentence)a[0];</span>
+<span class="nc" id="L238">            final Term beliefTerm = (Term)a[1];</span>
+<span class="nc" id="L239">            final Term taskTerm = (Term)a[2];</span>
+<span class="nc" id="L240">            final DerivationContext nal = (DerivationContext)a[3];</span>
+<span class="nc" id="L241">            beliefReason(belief, beliefTerm, taskTerm, nal);</span>
+        }
+<span class="fc" id="L243">    }</span>
+    
+    public static void InternalExperienceFromBelief(final Memory memory, final Task task, final Sentence belief, final Timable time) {
+<span class="fc" id="L246">        final Task newTask = new Task(belief.clone(), task.budget.clone(), Task.EnumType.INPUT);</span>
+
+<span class="fc" id="L248">        InternalExperienceFromTask(memory, newTask, false, time);</span>
+<span class="fc" id="L249">    }</span>
+    
+    public static void InternalExperienceFromTask(final Memory memory, final Task task, final boolean full, final Timable time) {
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if(memory.internalExperience == null) {</span>
+<span class="nc" id="L253">            return;</span>
+        }
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if(!memory.internalExperience.OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY) {</span>
+<span class="fc" id="L256">            InternalExperienceFromTaskInternal(memory, task, full, time);</span>
+        }
+<span class="fc" id="L258">    }</span>
+
+    public static boolean InternalExperienceFromTaskInternal(final Memory memory, final Task task, final boolean full, final Timable time) {
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        if(!enabled) {</span>
+<span class="nc" id="L262">            return false;</span>
+        }
+        
+       // if(OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY ||
+       //         (!OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY &amp;&amp; (task.sentence.punctuation==Symbols.QUESTION_MARK || task.sentence.punctuation==Symbols.QUEST_MARK))) {
+        {
+<span class="fc bfc" id="L268" title="All 4 branches covered.">            if(task.sentence.punctuation == Symbols.QUESTION_MARK || task.sentence.punctuation == Symbols.QUEST_MARK) {</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                if(task.getPriority()&lt;memory.internalExperience.MINIMUM_PRIORITY_TO_CREATE_WONDER_EVALUATE) {</span>
+<span class="fc" id="L270">                    return false;</span>
+                }
+            }
+            else
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            if(task.getPriority()&lt;memory.internalExperience.MINIMUM_PRIORITY_TO_CREATE_WANT_BELIEVE_ETC) {</span>
+<span class="fc" id="L275">                return false;</span>
+            }
+        }
+        
+<span class="fc" id="L279">        final Term content=task.getTerm();</span>
+        // to prevent infinite recursions
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (content instanceof Operation/* ||  nal.memory.randomNumber.nextDouble()&gt;Parameters.INTERNAL_EXPERIENCE_PROBABILITY*/) {</span>
+<span class="fc" id="L282">            return true;</span>
+        }
+<span class="fc" id="L284">        final Sentence sentence = task.sentence;</span>
+<span class="fc" id="L285">        final TruthValue truth = new TruthValue(1.0f, memory.narParameters.DEFAULT_JUDGMENT_CONFIDENCE, memory.narParameters);</span>
+<span class="fc" id="L286">        final Stamp stamp = task.sentence.stamp.clone();</span>
+<span class="fc" id="L287">        stamp.setOccurrenceTime(time.time());</span>
+<span class="fc" id="L288">        final Term ret=toTerm(sentence, memory, time);</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        if (ret==null) {</span>
+<span class="nc" id="L290">            return true;</span>
+        }
+<span class="fc" id="L292">        final Sentence j = new Sentence(</span>
+            ret,
+            Symbols.JUDGMENT_MARK,
+            truth,
+            stamp);
+
+<span class="fc" id="L298">        final BudgetValue newbudget=new BudgetValue(</span>
+                memory.narParameters.DEFAULT_JUDGMENT_CONFIDENCE*memory.internalExperience.INTERNAL_EXPERIENCE_PRIORITY_MUL,
+                memory.narParameters.DEFAULT_JUDGMENT_PRIORITY*memory.internalExperience.INTERNAL_EXPERIENCE_DURABILITY_MUL,
+<span class="fc" id="L301">                BudgetFunctions.truthToQuality(truth), memory.narParameters);</span>
+        
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">        if(!memory.internalExperience.OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY) {</span>
+<span class="fc" id="L304">            newbudget.setPriority(task.getPriority()*memory.internalExperience.INTERNAL_EXPERIENCE_PRIORITY_MUL);</span>
+<span class="fc" id="L305">            newbudget.setDurability(task.getDurability()*memory.internalExperience.INTERNAL_EXPERIENCE_DURABILITY_MUL);</span>
+        }
+
+<span class="fc" id="L308">        final Task newTask = new Task(j, newbudget, Task.EnumType.INPUT);</span>
+
+<span class="fc" id="L310">        memory.addNewTask(newTask, &quot;Reflected mental operation (Internal Experience)&quot;);</span>
+<span class="fc" id="L311">        return false;</span>
+    }
+
+<span class="fc" id="L314">    final static String[] nonInnateBeliefOperators = new String[] {</span>
+        &quot;^remind&quot;,&quot;^doubt&quot;,&quot;^consider&quot;,&quot;^evaluate&quot;,&quot;hestitate&quot;,&quot;^wonder&quot;,&quot;^belief&quot;,&quot;^want&quot;
+    }; 
+    
+    /** used in full internal experience mode only */
+    protected void beliefReason(final Sentence belief, final Term beliefTerm, final Term taskTerm, final DerivationContext nal) {
+        
+<span class="nc" id="L321">        final Memory memory = nal.memory;</span>
+    
+<span class="nc bnc" id="L323" title="All 2 branches missed.">        if (nal.memory.randomNumber.nextDouble() &lt; INTERNAL_EXPERIENCE_RARE_PROBABILITY ) {</span>
+            
+            //the operators which dont have a innate belief
+            //also get a chance to reveal its effects to the system this way
+<span class="nc" id="L327">            final Operator op=memory.getOperator(nonInnateBeliefOperators[nal.memory.randomNumber.nextInt(nonInnateBeliefOperators.length)]);</span>
+            
+<span class="nc" id="L329">            final Product prod=new Product(belief.term);</span>
+            
+<span class="nc bnc" id="L331" title="All 4 branches missed.">            if(op!=null &amp;&amp; prod!=null) {</span>
+                
+<span class="nc" id="L333">                final Term new_term=Inheritance.make(prod, op);</span>
+<span class="nc" id="L334">                final Sentence sentence = new Sentence(</span>
+                    new_term,
+                    Symbols.GOAL_MARK,
+                    new TruthValue(1, memory.narParameters.DEFAULT_JUDGMENT_CONFIDENCE, memory.narParameters),  // a naming convension
+                    new Stamp(nal.time, memory));
+                
+<span class="nc" id="L340">                final float quality = BudgetFunctions.truthToQuality(sentence.truth);</span>
+<span class="nc" id="L341">                final BudgetValue budget = new BudgetValue(</span>
+                    memory.narParameters.DEFAULT_GOAL_PRIORITY*INTERNAL_EXPERIENCE_PRIORITY_MUL, 
+                    memory.narParameters.DEFAULT_GOAL_DURABILITY*INTERNAL_EXPERIENCE_DURABILITY_MUL, 
+                    quality, memory.narParameters);
+
+<span class="nc" id="L346">                final Task newTask = new Task(sentence, budget, Task.EnumType.INPUT);</span>
+
+<span class="nc" id="L348">                nal.derivedTask(newTask, false, false, false);</span>
+            }
+        }
+
+<span class="nc bnc" id="L352" title="All 4 branches missed.">        if (beliefTerm instanceof Implication &amp;&amp; nal.memory.randomNumber.nextDouble()&lt;=INTERNAL_EXPERIENCE_PROBABILITY) {</span>
+<span class="nc" id="L353">            final Implication imp=(Implication) beliefTerm;</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">            if(imp.getTemporalOrder()==TemporalRules.ORDER_FORWARD) {</span>
+                //1. check if its (&amp;/,term,+i1,...,+in) =/&gt; anticipateTerm form:
+<span class="nc" id="L356">                boolean valid=true;</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">                if(imp.getSubject() instanceof Conjunction) {</span>
+<span class="nc" id="L358">                    final Conjunction conj=(Conjunction) imp.getSubject();</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">                    if(!conj.term[0].equals(taskTerm)) {</span>
+<span class="nc" id="L360">                        valid=false; //the expected needed term is not included</span>
+                    }
+<span class="nc bnc" id="L362" title="All 2 branches missed.">                    for(int i=1;i&lt;conj.term.length;i++) {</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">                        if(!(conj.term[i] instanceof Interval)) {</span>
+<span class="nc" id="L364">                            valid=false;</span>
+<span class="nc" id="L365">                            break;</span>
+                        }
+                    }
+<span class="nc" id="L368">                } else {</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">                    if(!imp.getSubject().equals(taskTerm)) {</span>
+<span class="nc" id="L370">                        valid=false;</span>
+                    }
+                }    
+
+<span class="nc bnc" id="L374" title="All 2 branches missed.">                if(valid) {</span>
+<span class="nc" id="L375">                    final Operator op=memory.getOperator(&quot;^anticipate&quot;);</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">                    if (op == null)</span>
+<span class="nc" id="L377">                        throw new IllegalStateException(this + &quot; requires ^anticipate operator&quot;);</span>
+                    
+<span class="nc" id="L379">                    final Product args=new Product(imp.getPredicate());</span>
+<span class="nc" id="L380">                    final Term new_term=Operation.make(args,op);</span>
+
+<span class="nc" id="L382">                    final Sentence sentence = new Sentence(</span>
+                        new_term,
+                        Symbols.GOAL_MARK,
+                        new TruthValue(1, memory.narParameters.DEFAULT_JUDGMENT_CONFIDENCE, memory.narParameters),  // a naming convension
+                        new Stamp(nal.time, memory));
+
+<span class="nc" id="L388">                    final float quality = BudgetFunctions.truthToQuality(sentence.truth);</span>
+<span class="nc" id="L389">                    final BudgetValue budget = new BudgetValue(</span>
+                        memory.narParameters.DEFAULT_GOAL_PRIORITY*INTERNAL_EXPERIENCE_PRIORITY_MUL, 
+                        memory.narParameters.DEFAULT_GOAL_DURABILITY*INTERNAL_EXPERIENCE_DURABILITY_MUL, 
+                        quality, memory.narParameters);
+
+<span class="nc" id="L394">                    final Task newTask = new Task(sentence, budget, Task.EnumType.INPUT);</span>
+
+<span class="nc" id="L396">                    nal.derivedTask(newTask, false, false, false);</span>
+                }
+            }
+        }
+<span class="nc" id="L400">    }    </span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

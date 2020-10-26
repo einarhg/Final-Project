@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Anticipate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.operator.mental</a> &gt; <span class="el_source">Anticipate.java</span></div><h1>Anticipate.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.operator.mental;
+
+import org.opennars.control.DerivationContext;
+import org.opennars.entity.*;
+import org.opennars.inference.BudgetFunctions;
+import org.opennars.interfaces.Timable;
+import org.opennars.io.Symbols;
+import org.opennars.io.events.EventEmitter.EventObserver;
+import org.opennars.io.events.Events;
+import org.opennars.io.events.Events.CycleEnd;
+import org.opennars.io.events.OutputHandler.ANTICIPATE;
+import org.opennars.io.events.OutputHandler.CONFIRM;
+import org.opennars.io.events.OutputHandler.DISAPPOINT;
+import org.opennars.language.Interval;
+import org.opennars.language.Product;
+import org.opennars.language.Term;
+import org.opennars.main.Nar;
+import org.opennars.operator.Operation;
+import org.opennars.operator.Operator;
+import org.opennars.storage.Memory;
+
+import java.util.*;
+
+/**
+ * Operator that creates a judgment with a given statement
+ */
+public class Anticipate extends Operator implements EventObserver {
+
+<span class="fc" id="L52">    public final Map&lt;Prediction,LinkedHashSet&lt;Term&gt;&gt; anticipations = new LinkedHashMap();</span>
+            
+<span class="fc" id="L54">    private transient Set&lt;Term&gt; newTasks = new LinkedHashSet();</span>
+ 
+<span class="fc" id="L56">    private TruthValue expiredTruth = null;</span>
+<span class="fc" id="L57">    private BudgetValue expiredBudget = null;</span>
+    
+     //internal experience has less durability?
+<span class="fc" id="L60">    public float ANTICIPATION_DURABILITY_MUL=0.1f; //0.1</span>
+    //internal experience has less priority?
+<span class="fc" id="L62">    public float ANTICIPATION_PRIORITY_MUL=0.1f; //0.1</span>
+
+
+    private transient DerivationContext nal; //don't serialize, it will be re-set after deserialization
+
+
+    public Anticipate() {
+<span class="fc" id="L69">        super(&quot;^anticipate&quot;);        </span>
+<span class="fc" id="L70">    }</span>
+    public Anticipate(float ANTICIPATION_DURABILITY_MUL, float ANTICIPATION_PRIORITY_MUL) {
+<span class="fc" id="L72">        this();</span>
+<span class="fc" id="L73">        this.ANTICIPATION_DURABILITY_MUL = ANTICIPATION_DURABILITY_MUL;</span>
+<span class="fc" id="L74">        this.ANTICIPATION_PRIORITY_MUL = ANTICIPATION_PRIORITY_MUL;</span>
+<span class="fc" id="L75">    }</span>
+
+    @Override
+    public boolean setEnabled(final Nar n, final boolean enabled) {
+<span class="fc" id="L79">        n.memory.event.set(this, enabled, Events.InduceSucceedingEvent.class, Events.CycleEnd.class);</span>
+<span class="fc" id="L80">        expiredTruth = new TruthValue(0.0f, n.narParameters.DEFAULT_JUDGMENT_CONFIDENCE, n.narParameters);</span>
+<span class="fc" id="L81">        expiredBudget = new BudgetValue(n.narParameters.DEFAULT_JUDGMENT_PRIORITY, </span>
+                                                    n.narParameters.DEFAULT_JUDGMENT_DURABILITY, 
+<span class="fc" id="L83">                                                    BudgetFunctions.truthToQuality(expiredTruth), n.narParameters);</span>
+<span class="fc" id="L84">        return true;</span>
+    }
+
+    public void updateAnticipations(DerivationContext nal) {
+
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (anticipations.isEmpty()) return;</span>
+
+<span class="nc" id="L91">        final long now=nal.time.time();</span>
+                
+        //share stamps created by tasks in this cycle
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if(newTasks == null) {</span>
+<span class="nc" id="L95">            newTasks = new LinkedHashSet();</span>
+        }
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        boolean hasNewTasks = !newTasks.isEmpty();</span>
+        
+<span class="nc" id="L99">        final Iterator&lt;Map.Entry&lt;Prediction, LinkedHashSet&lt;Term&gt;&gt;&gt; aei = anticipations.entrySet().iterator();</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        while (aei.hasNext()) {</span>
+            
+<span class="nc" id="L102">            final Map.Entry&lt;Prediction, LinkedHashSet&lt;Term&gt;&gt; ae = aei.next();</span>
+            
+<span class="nc" id="L104">            final long aTime = ae.getKey().predictedOccurenceTime;</span>
+<span class="nc" id="L105">            final long predictionstarted=ae.getKey().predictionCreationTime;</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            if(aTime &lt; predictionstarted) { //its about the past..</span>
+<span class="nc" id="L107">                return;</span>
+            }
+            
+            //lets say  a and &lt;(&amp;/,a,+4) =/&gt; b&gt; leaded to prediction of b with specific occurence time
+            //this indicates that this interval can be reconstructed by looking by when the prediction
+            //happened and for what time it predicted, Only when the happening would already lead to &lt;(&amp;/,a,+5) =/&gt; b&gt;
+            //we are allowed to apply CWA already, i think this is the perfect time to do this
+            //since there is no way anymore that the observation would support &lt;(&amp;/,a,+4) =/&gt; b&gt; at this time,
+            //also this way it is not applied to early, it seems to be the perfect time to me,
+            //making hopeExpirationWindow parameter entirely osbolete
+<span class="nc" id="L117">            final Interval Int=new Interval(aTime-predictionstarted);</span>
+            //ok we know the magnitude now, let's now construct a interval with magnitude one higher
+            //(this we can skip because magnitudeToTime allows it without being explicitly constructed)
+            //ok, and what predicted occurence time would that be? because only if now is bigger or equal, didnt happen is true
+<span class="nc" id="L121">            final double expiredate=predictionstarted+Int.time*nal.narParameters.ANTICIPATION_TOLERANCE;</span>
+            //
+            
+<span class="nc bnc" id="L124" title="All 2 branches missed.">            final boolean didntHappen = (now&gt;=expiredate);</span>
+<span class="nc bnc" id="L125" title="All 4 branches missed.">            final boolean maybeHappened = hasNewTasks &amp;&amp; !didntHappen;</span>
+                
+<span class="nc bnc" id="L127" title="All 4 branches missed.">            if ((!didntHappen) &amp;&amp; (!maybeHappened))</span>
+<span class="nc" id="L128">                continue;</span>
+            
+<span class="nc" id="L130">            final LinkedHashSet&lt;Term&gt; terms = ae.getValue();</span>
+            
+<span class="nc" id="L132">            final Iterator&lt;Term&gt; ii = terms.iterator();</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            while (ii.hasNext()) {</span>
+<span class="nc" id="L134">                final Term aTerm = ii.next();</span>
+                
+<span class="nc" id="L136">                boolean remove = false;</span>
+                
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                if (didntHappen) {</span>
+<span class="nc" id="L139">                    deriveDidntHappen(aTerm,aTime,nal);</span>
+<span class="nc" id="L140">                    remove = true;</span>
+                }
+
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                if (maybeHappened) {</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">                    if(newTasks == null) {</span>
+<span class="nc" id="L145">                        newTasks = new LinkedHashSet();</span>
+                    }
+<span class="nc bnc" id="L147" title="All 2 branches missed.">                    if (newTasks.remove(aTerm)) {</span>
+                        //in case it happened, temporal induction will do the rest, else deriveDidntHappen occurred
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                        if(!remove) {</span>
+<span class="nc" id="L150">                            nal.memory.emit(CONFIRM.class, aTerm);</span>
+                        }
+<span class="nc" id="L152">                        remove = true; </span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                        hasNewTasks = !newTasks.isEmpty();</span>
+                    }
+                }
+                
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                if (remove)</span>
+<span class="nc" id="L158">                    ii.remove();</span>
+<span class="nc" id="L159">            }</span>
+            
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            if (terms.isEmpty()) {</span>
+                //remove this time entry because its terms have been emptied
+<span class="nc" id="L163">                aei.remove();</span>
+            }
+<span class="nc" id="L165">        }       </span>
+    
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if(newTasks == null) {</span>
+<span class="nc" id="L168">            newTasks = new LinkedHashSet();</span>
+        }
+<span class="nc" id="L170">        newTasks.clear();        </span>
+<span class="nc" id="L171">    }</span>
+    
+    @Override
+    public void event(final Class event, final Object[] args) {
+<span class="pc bpc" id="L175" title="1 of 4 branches missed.">        if (event == Events.InduceSucceedingEvent.class || event == Events.TaskDerive.class) {            </span>
+<span class="fc" id="L176">            final Task newEvent = (Task)args[0];</span>
+<span class="fc" id="L177">            DerivationContext nal= (DerivationContext)args[1];</span>
+<span class="fc" id="L178">            this.nal = nal;</span>
+            
+<span class="pc bpc" id="L180" title="1 of 8 branches missed.">            if (newEvent.sentence.truth != null &amp;&amp; newEvent.sentence.isJudgment() &amp;&amp; newEvent.sentence.truth.getExpectation() &gt; nal.narParameters.DEFAULT_CONFIRMATION_EXPECTATION &amp;&amp; !newEvent.sentence.isEternal()) {</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                if(newTasks == null) {</span>
+<span class="nc" id="L182">                    newTasks = new LinkedHashSet();</span>
+                }
+<span class="fc" id="L184">                newTasks.add(newEvent.getTerm()); //new: always add but keep truth value in mind</span>
+            }
+        }
+
+<span class="fc bfc" id="L188" title="All 4 branches covered.">        if (this.nal!=null &amp;&amp; event == CycleEnd.class) {            </span>
+<span class="fc" id="L189">            updateAnticipations(this.nal);</span>
+        }
+<span class="fc" id="L191">    }</span>
+    
+
+    // to create a judgment with a given statement
+    @Override
+    protected List&lt;Task&gt; execute(final Operation operation, final Term[] args, final Memory memory, final Timable time) {
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (operation==null) {</span>
+<span class="nc" id="L198">            return null; //not as mental operator but as fundamental principle</span>
+        }
+        
+<span class="nc" id="L201">        anticipate(args[1], memory, time.time()+memory.narParameters.DURATION, null, time);</span>
+        
+<span class="nc" id="L203">        return null;</span>
+    }
+    
+<span class="fc" id="L206">    boolean anticipationOperator=true; //a parameter which tells whether NARS should know if it anticipated or not</span>
+    //in one case its the base functionality needed for NAL7 and in the other its a mental NAL9 operator
+    
+    public boolean isAnticipationAsOperator() {
+<span class="nc" id="L210">        return anticipationOperator;</span>
+    }
+    
+    public void setAnticipationAsOperator(final boolean val) {
+<span class="nc" id="L214">        anticipationOperator=val;</span>
+<span class="nc" id="L215">    }</span>
+    
+    public void anticipate(final Term content, final Memory memory, final long occurenceTime, final Task t, final Timable time) {
+<span class="nc bnc" id="L218" title="All 4 branches missed.">        if(t!=null &amp;&amp; t.sentence.truth.getExpectation() &lt; memory.narParameters.DEFAULT_CONFIRMATION_EXPECTATION) {</span>
+<span class="nc" id="L219">            return;</span>
+        }
+
+<span class="nc bnc" id="L222" title="All 2 branches missed.">       if(t != null) {</span>
+<span class="nc" id="L223">           memory.emit(ANTICIPATE.class, t);</span>
+       } else  {
+<span class="nc" id="L225">          memory.emit(ANTICIPATE.class, content);</span>
+       }
+
+<span class="nc" id="L228">        final LinkedHashSet&lt;Term&gt; ae = new LinkedHashSet();</span>
+<span class="nc" id="L229">        anticipations.put(new Prediction(time.time(),occurenceTime), ae);</span>
+
+<span class="nc" id="L231">        ae.add(content);</span>
+<span class="nc" id="L232">        anticipationFeedback(content, t, memory, time);</span>
+<span class="nc" id="L233">    }</span>
+
+    public void anticipationFeedback(final Term content, final Task t, final Memory memory, final Timable time) {
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if(anticipationOperator) {</span>
+<span class="fc" id="L237">            final Operation op=(Operation) Operation.make(Product.make(Term.SELF,content), this);</span>
+<span class="fc" id="L238">            final TruthValue truth=new TruthValue(1.0f,memory.narParameters.DEFAULT_JUDGMENT_CONFIDENCE, memory.narParameters);</span>
+            final Stamp st;
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">            if(t==null) {</span>
+<span class="fc" id="L241">                st=new Stamp(time, memory);</span>
+            } else {
+<span class="nc" id="L243">                st=t.sentence.stamp.clone();</span>
+<span class="nc" id="L244">                st.setOccurrenceTime(time.time());</span>
+            }
+
+<span class="fc" id="L247">            final Sentence s=new Sentence(</span>
+                    op,
+                    Symbols.JUDGMENT_MARK,
+                    truth,
+                    st);
+
+<span class="fc" id="L253">            final BudgetValue budgetForNewTask = new BudgetValue(</span>
+                memory.narParameters.DEFAULT_JUDGMENT_PRIORITY*ANTICIPATION_PRIORITY_MUL,
+                memory.narParameters.DEFAULT_JUDGMENT_DURABILITY*ANTICIPATION_DURABILITY_MUL,
+<span class="fc" id="L256">                BudgetFunctions.truthToQuality(truth), memory.narParameters);</span>
+<span class="fc" id="L257">            final Task newTask = new Task(s, budgetForNewTask, Task.EnumType.INPUT);</span>
+
+<span class="fc" id="L259">            memory.addNewTask(newTask, &quot;Perceived (Internal Experience: Anticipation)&quot;);</span>
+        }
+<span class="fc" id="L261">    }</span>
+
+    protected void deriveDidntHappen(final Term aTerm, final long expectedOccurenceTime, DerivationContext nal) {
+
+<span class="nc" id="L265">        final TruthValue truth = expiredTruth;</span>
+<span class="nc" id="L266">        final BudgetValue budget = expiredBudget;</span>
+
+<span class="nc" id="L268">        final Stamp stamp = new Stamp(nal.time, nal.memory);</span>
+        //stamp.setOccurrenceTime(nal.memory.time());
+<span class="nc" id="L270">        stamp.setOccurrenceTime(expectedOccurenceTime); //it did not happen, so the time of when it did not </span>
+        //happen is exactly the time it was expected
+        
+<span class="nc" id="L273">        final Sentence S = new Sentence(</span>
+            aTerm,
+            Symbols.JUDGMENT_MARK,
+            truth,
+            stamp);
+
+<span class="nc" id="L279">        final Task task = new Task(S, budget, Task.EnumType.INPUT);</span>
+
+<span class="nc" id="L281">        nal.derivedTask(task, false, true, false); </span>
+<span class="nc" id="L282">        task.setElemOfSequenceBuffer(true);</span>
+<span class="nc" id="L283">        nal.memory.emit(DISAPPOINT.class, task);</span>
+<span class="nc" id="L284">    }</span>
+
+    class Prediction {
+        public final long predictionCreationTime; //2014 and this is still the best way to define a data structure that simple?
+        public final long predictedOccurenceTime;
+<span class="nc" id="L289">        public Prediction(final long predictionCreationTime, final long predictedOccurenceTime) { //rest of the crap:</span>
+<span class="nc" id="L290">            this.predictionCreationTime=predictionCreationTime; //when the prediction happened</span>
+<span class="nc" id="L291">            this.predictedOccurenceTime=predictedOccurenceTime; //when the event is expected</span>
+<span class="nc" id="L292">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,574 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Narsese.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.io</a> &gt; <span class="el_source">Narsese.java</span></div><h1>Narsese.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.io;
+
+import org.opennars.entity.*;
+import org.opennars.io.Symbols.*;
+import org.opennars.language.*;
+import org.opennars.main.Nar;
+import org.opennars.main.Debug;
+import org.opennars.operator.Operation;
+import org.opennars.operator.Operator;
+import org.opennars.storage.Memory;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+
+import static java.lang.Float.parseFloat;
+import static java.lang.String.valueOf;
+import static org.opennars.inference.BudgetFunctions.truthToQuality;
+import static org.opennars.io.Symbols.*;
+import static org.opennars.io.Symbols.NativeOperator.*;
+import static org.opennars.language.Variables.containVar;
+import static org.opennars.operator.Operation.make;
+
+/**
+ * Utility methods for working and reacting to Narsese input.
+ * This will eventually be integrated with NarseseParser for systematic
+ * parsing and prediction of input.
+ *
+ * @author Patrick Hammer
+ */
+public class Narsese implements Serializable, Parser {
+    
+    public final Memory memory;
+    
+<span class="fc" id="L58">    public Narsese(final Memory memory) {</span>
+<span class="fc" id="L59">        this.memory = memory;</span>
+<span class="fc" id="L60">    }</span>
+
+    public Narsese(final Nar n) {
+<span class="fc" id="L63">        this(n.memory);</span>
+<span class="fc" id="L64">    }</span>
+    
+    /**
+     * Enter a new Task in String into the memory, called from InputWindow or
+     * locally.
+     *
+     * @param s the single-line addInput String
+     * @return An experienced task
+     */
+    @Override
+    public Task parseTask(final String s) throws Parser.InvalidInputException {
+<span class="fc" id="L75">        final StringBuilder buffer = new StringBuilder(s);</span>
+        
+<span class="fc" id="L77">        final String budgetString = getBudgetString(buffer);</span>
+<span class="fc" id="L78">        final String truthString = getTruthString(buffer);</span>
+<span class="fc" id="L79">        final Tense tense = parseTense(buffer);</span>
+<span class="fc" id="L80">        final String str = buffer.toString().trim();</span>
+<span class="fc" id="L81">        final int last = str.length() - 1;</span>
+<span class="fc" id="L82">        final char punc = str.charAt(last);</span>
+        
+<span class="fc" id="L84">        final Stamp stamp = new Stamp(-1 /* if -1, will be set right before the Task is input */,</span>
+<span class="fc" id="L85">                tense, memory.newStampSerial(), this.memory.narParameters.DURATION);</span>
+
+<span class="fc" id="L87">        final TruthValue truth = parseTruth(truthString, punc);</span>
+<span class="fc" id="L88">        final Term content = parseTerm(str.substring(0, last));</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (content == null) throw new Parser.InvalidInputException(&quot;Content term missing&quot;);</span>
+            
+<span class="fc" id="L91">        final Sentence sentence = new Sentence(</span>
+            content,
+            punc,
+            truth,
+            stamp);
+
+        //if ((content instanceof Conjunction) &amp;&amp; Variable.containVarDep(content.getName())) {
+        //    sentence.setRevisible(false);
+        //}
+<span class="fc" id="L100">        final BudgetValue budget = parseBudget(budgetString, punc, truth);</span>
+<span class="fc" id="L101">        return new Task(sentence, budget, Task.EnumType.INPUT);</span>
+    }
+
+    /* ---------- react values ---------- */
+    /**
+     * Return the prefix of a task symbol that contains a BudgetValue
+     *
+     * @param s the addInput in a StringBuilder
+     * @return a String containing a BudgetValue
+     *
+     * @throws Parser.InvalidInputException if the addInput cannot be parsed into a BudgetValue
+     */
+    private static String getBudgetString(final StringBuilder s) throws Parser.InvalidInputException {
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">        if (s.length() == 0 || s.charAt(0) != BUDGET_VALUE_MARK) {</span>
+<span class="fc" id="L115">            return null;</span>
+        }
+<span class="fc" id="L117">        final int i = s.indexOf(valueOf(BUDGET_VALUE_MARK), 1);    // looking for the end</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (i &lt; 0) {</span>
+<span class="nc" id="L119">            throw new Parser.InvalidInputException(&quot;missing budget closer&quot;);</span>
+        }
+<span class="fc" id="L121">        final String budgetString = s.substring(1, i).trim();</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (budgetString.length() == 0) {</span>
+<span class="nc" id="L123">            throw new Parser.InvalidInputException(&quot;empty budget&quot;);</span>
+        }
+<span class="fc" id="L125">        s.delete(0, i + 1);</span>
+<span class="fc" id="L126">        return budgetString;</span>
+    }
+
+    /**
+     * Return the postfix of a task symbol that contains a TruthValue
+     *
+     * @return a String containing a TruthValue
+     * @param s the addInput in a StringBuilder
+     *
+     * @throws Parser.InvalidInputException if the addInput cannot be parsed into a TruthValue
+     */
+    private static String getTruthString(final StringBuilder s) throws Parser.InvalidInputException {
+<span class="fc" id="L138">        final int last = s.length() - 1;</span>
+<span class="pc bpc" id="L139" title="1 of 4 branches missed.">        if (s.length() == 0 || s.charAt(last) != TRUTH_VALUE_MARK) {       // use default</span>
+<span class="fc" id="L140">            return null;</span>
+        }
+<span class="fc" id="L142">        final int first = s.indexOf(valueOf(TRUTH_VALUE_MARK));    // looking for the beginning</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (first == last) { // no matching closer</span>
+<span class="nc" id="L144">            throw new Parser.InvalidInputException(&quot;missing truth mark&quot;);</span>
+        }
+<span class="fc" id="L146">        final String truthString = s.substring(first + 1, last).trim();</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (truthString.length() == 0) {                // empty usage</span>
+<span class="nc" id="L148">            throw new Parser.InvalidInputException(&quot;empty truth&quot;);</span>
+        }
+<span class="fc" id="L150">        s.delete(first, last + 1);                 // remaining addInput to be processed outside</span>
+<span class="fc" id="L151">        s.trimToSize();</span>
+<span class="fc" id="L152">        return truthString;</span>
+    }
+
+    /**
+     * react the addInput String into a TruthValue (or DesireValue)
+     *
+     * @param s addInput String
+     * @param type Task type
+     * @return the addInput TruthValue
+     */
+    private TruthValue parseTruth(final String s, final char type) {
+<span class="fc bfc" id="L163" title="All 4 branches covered.">        if ((type == QUESTION_MARK) || (type == QUEST_MARK)) {</span>
+<span class="fc" id="L164">            return null;</span>
+        }
+<span class="fc" id="L166">        float frequency = 1.0f;</span>
+<span class="fc" id="L167">        float confidence = memory.narParameters.DEFAULT_JUDGMENT_CONFIDENCE;</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if(type==GOAL_MARK) {</span>
+<span class="fc" id="L169">            confidence = memory.narParameters.DEFAULT_GOAL_CONFIDENCE;</span>
+        }
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (s != null) {</span>
+<span class="fc" id="L172">            final int i = s.indexOf(VALUE_SEPARATOR);</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            if (i &lt; 0) {</span>
+<span class="fc" id="L174">                frequency = parseFloat(s);</span>
+            } else {
+<span class="fc" id="L176">                frequency = parseFloat(s.substring(0, i));</span>
+<span class="fc" id="L177">                confidence = parseFloat(s.substring(i + 1));</span>
+            }
+        }
+<span class="fc" id="L180">        return new TruthValue(frequency, confidence, memory.narParameters);</span>
+    }
+
+    /**
+     * react the addInput String into a BudgetValue
+     *
+     * @param truth the TruthValue of the task
+     * @param s addInput String
+     * @param punctuation Task punctuation
+     * @return the addInput BudgetValue
+     * @throws Parser.InvalidInputException If the String cannot be parsed into a BudgetValue
+     */
+    private BudgetValue parseBudget(final String s, final char punctuation, final TruthValue truth) throws Parser.InvalidInputException {
+        float priority, durability;
+<span class="pc bpc" id="L194" title="1 of 5 branches missed.">        switch (punctuation) {</span>
+            case JUDGMENT_MARK:
+<span class="fc" id="L196">                priority = memory.narParameters.DEFAULT_JUDGMENT_PRIORITY;</span>
+<span class="fc" id="L197">                durability = memory.narParameters.DEFAULT_JUDGMENT_DURABILITY;</span>
+<span class="fc" id="L198">                break;</span>
+            case QUESTION_MARK:
+<span class="fc" id="L200">                priority = memory.narParameters.DEFAULT_QUESTION_PRIORITY;</span>
+<span class="fc" id="L201">                durability = memory.narParameters.DEFAULT_QUESTION_DURABILITY;</span>
+<span class="fc" id="L202">                break;</span>
+            case GOAL_MARK:
+<span class="fc" id="L204">                priority = memory.narParameters.DEFAULT_GOAL_PRIORITY;</span>
+<span class="fc" id="L205">                durability = memory.narParameters.DEFAULT_GOAL_DURABILITY;</span>
+<span class="fc" id="L206">                break;</span>
+            case QUEST_MARK:
+<span class="fc" id="L208">                priority = memory.narParameters.DEFAULT_QUEST_PRIORITY;</span>
+<span class="fc" id="L209">                durability = memory.narParameters.DEFAULT_QUEST_DURABILITY;</span>
+<span class="fc" id="L210">                break;                </span>
+            default:
+<span class="nc" id="L212">                throw new Parser.InvalidInputException(&quot;unknown punctuation: '&quot; + punctuation + &quot;'&quot;);</span>
+        }
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (s != null) { // overrite default</span>
+<span class="fc" id="L215">            final int i = s.indexOf(VALUE_SEPARATOR);</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">            if (i &lt; 0) {        // default durability</span>
+<span class="nc" id="L217">                priority = parseFloat(s);</span>
+            } else {
+<span class="fc" id="L219">                int i2 = s.indexOf(VALUE_SEPARATOR, i+1);</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">                if (i2 == -1)</span>
+<span class="fc" id="L221">                    i2 = s.length();</span>
+<span class="fc" id="L222">                priority = parseFloat(s.substring(0, i));</span>
+<span class="fc" id="L223">                durability = parseFloat(s.substring(i + 1, i2));</span>
+            }
+        }
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        final float quality = (truth == null) ? 1 : truthToQuality(truth);</span>
+<span class="fc" id="L227">        return new BudgetValue(priority, durability, quality, memory.narParameters);</span>
+    }
+
+    /**
+     * Recognize the tense of an addInput sentence
+     * @param s the addInput in a StringBuilder
+     * @return a tense value
+     */
+    public static Tense parseTense(final StringBuilder s) {
+<span class="fc" id="L236">        final int i = s.indexOf(Symbols.TENSE_MARK);</span>
+<span class="fc" id="L237">        String t = &quot;&quot;;</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        if (i &gt; 0) {</span>
+<span class="fc" id="L239">            t = s.substring(i).trim();</span>
+<span class="fc" id="L240">            s.delete(i, s.length());</span>
+        }
+<span class="fc" id="L242">        return Tense.tense(t);</span>
+    }
+
+    
+    
+    /* ---------- react String into term ---------- */
+    /**
+     * Top-level method that react a Term in general, which may recursively call itself.
+     * &lt;p&gt;
+     * There are 5 valid cases: 1. (Op, A1, ..., An) is a CompoundTerm if Op is
+     * a built-in getOperator 2. {A1, ..., An} is an SetExt; 3. [A1, ..., An] is an
+     * SetInt; 4. &amp;lt;T1 Re T2&amp;gt; is a Statement (including higher-order Statement);
+     * 5. otherwise it is a simple term.
+     *
+     * @param s the String to be parsed
+     * @return the Term generated from the String
+     *
+     * @throws Parser.InvalidInputException if the String couldn't get parsed to a term
+     */
+    public Term parseTerm(String s) throws Parser.InvalidInputException {
+<span class="fc" id="L262">        s = s.trim();</span>
+        
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        if (s.length() == 0) return null;</span>
+        
+<span class="fc" id="L266">        final int index = s.length() - 1;</span>
+<span class="fc" id="L267">        final char first = s.charAt(0);</span>
+<span class="fc" id="L268">        final char last = s.charAt(index);</span>
+
+<span class="fc" id="L270">        final NativeOperator opener = getOpener(first);</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        if (opener!=null) {</span>
+<span class="pc bpc" id="L272" title="1 of 5 branches missed.">            switch (opener) {</span>
+                case COMPOUND_TERM_OPENER:
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">                    if (last == COMPOUND_TERM_CLOSER.ch) {</span>
+<span class="fc" id="L275">                       return parseCompoundTerm(s.substring(1, index));</span>
+                    } else {
+<span class="nc" id="L277">                        throw new Parser.InvalidInputException(&quot;missing CompoundTerm closer&quot;);</span>
+                    }
+                case SET_EXT_OPENER:
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">                    if (last == SET_EXT_CLOSER.ch) {</span>
+<span class="fc" id="L281">                        return SetExt.make(parseArguments(s.substring(1, index) + ARGUMENT_SEPARATOR));</span>
+                    } else {
+<span class="nc" id="L283">                        throw new Parser.InvalidInputException(&quot;missing ExtensionSet closer&quot;);</span>
+                    }                    
+                case SET_INT_OPENER:
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">                    if (last == SET_INT_CLOSER.ch) {</span>
+<span class="fc" id="L287">                        return SetInt.make(parseArguments(s.substring(1, index) + ARGUMENT_SEPARATOR));</span>
+                    } else {
+<span class="nc" id="L289">                        throw new Parser.InvalidInputException(&quot;missing IntensionSet closer&quot;);</span>
+                    }   
+                case STATEMENT_OPENER:
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                    if (last == STATEMENT_CLOSER.ch) {</span>
+<span class="fc" id="L293">                        return parseStatement(s.substring(1, index));</span>
+                    } else {
+<span class="nc" id="L295">                        throw new Parser.InvalidInputException(&quot;missing Statement closer&quot;);</span>
+                    }
+            }
+        }
+        else {
+            
+            //parse functional operation:
+            //  function()
+            //  function(a)
+            //  function(a,b)
+            
+            //test for existence of matching parentheses at beginning at index!=0
+<span class="fc" id="L307">            final int pOpen = s.indexOf('(');</span>
+<span class="fc" id="L308">            final int pClose = s.lastIndexOf(')');</span>
+<span class="pc bpc" id="L309" title="2 of 6 branches missed.">            if ((pOpen!=-1) &amp;&amp; (pClose!=-1) &amp;&amp; (pClose==s.length()-1)) {</span>
+                
+<span class="fc" id="L311">                final String operatorString = Operator.addPrefixIfMissing( s.substring(0, pOpen) );</span>
+                                
+<span class="fc" id="L313">                final Operator operator = memory.getOperator(operatorString);</span>
+                
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">                if (operator == null) {</span>
+                    //???
+<span class="nc" id="L317">                    throw new Parser.InvalidInputException(&quot;Unknown operator: &quot; + operatorString);</span>
+                }
+                
+<span class="fc" id="L320">                final String argString = s.substring(pOpen+1, pClose+1);</span>
+                
+                
+                final Term[] a;
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">                if (argString.length() &gt; 1) {                </span>
+<span class="fc" id="L325">                    final List&lt;Term&gt; args = parseArguments(argString);</span>
+<span class="fc" id="L326">                    a = args.toArray(new Term[0]);</span>
+<span class="fc" id="L327">                }</span>
+                else {
+                    //void &quot;()&quot; arguments, default to (SELF)
+<span class="nc" id="L330">                    a = Operation.SELF_TERM_ARRAY;</span>
+                }                                                            
+                
+<span class="fc" id="L333">                final Operation o = Operation.make(operator, a, true);</span>
+<span class="fc" id="L334">                return o;                </span>
+            }
+        }
+
+        //if no opener, parse the term            
+<span class="fc" id="L339">        return parseAtomicTerm(s);</span>
+
+    }
+
+//    private static void showWarning(String message) {
+//		new TemporaryFrame( message + &quot;\n( the faulty line has been kept in the addInput window )&quot;,
+//				40000, TemporaryFrame.WARNING );
+//    }
+    /**
+     * Parse a term that has no internal structure.
+     * &lt;p&gt;
+     * The term can be a constant or a variable.
+     *
+     * @param s0 the String to be parsed
+     * @return the Term generated from the String
+     *
+     * @throws Parser.InvalidInputException if the String couldn't get parsed to a term
+     */
+    private Term parseAtomicTerm(final String s0) throws Parser.InvalidInputException {
+<span class="fc" id="L358">        final String s = s0.trim();</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        if (s.length() == 0) {</span>
+<span class="nc" id="L360">            throw new Parser.InvalidInputException(&quot;missing term&quot;);</span>
+        }
+        
+<span class="fc" id="L363">        final Operator op = memory.getOperator(s0);</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if(op != null) {</span>
+<span class="fc" id="L365">            return op;</span>
+        }
+        
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">        if (s.contains(&quot; &quot;)) { // invalid characters in a name</span>
+<span class="nc" id="L369">            throw new Parser.InvalidInputException(&quot;invalid term: &quot; + s);</span>
+        }
+        
+<span class="fc" id="L372">        final char c = s.charAt(0);</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        if (c == Symbols.INTERVAL_PREFIX) {</span>
+<span class="fc" id="L374">            return Interval.interval(s);</span>
+        }
+ 
+<span class="fc bfc" id="L377" title="All 4 branches covered.">        if (containVar(s) &amp;&amp; !s.equals(&quot;#&quot;)) {</span>
+<span class="fc" id="L378">            return new Variable(s);</span>
+        } else {
+<span class="fc" id="L380">            return Term.get(s);</span>
+        }
+    }
+
+    /**
+     * Parse a string to create a statement.
+     *
+     * @return the statement generated from the string
+     * @param s0 The addInput String to be parsed
+     *
+     * @throws Parser.InvalidInputException if the String couldn't get parsed to a term
+     */
+    private Statement parseStatement(final String s0) throws Parser.InvalidInputException {
+<span class="fc" id="L393">        final String s = s0.trim();</span>
+<span class="fc" id="L394">        final int i = topRelation(s);</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        if (i &lt; 0) {</span>
+<span class="nc" id="L396">            throw new Parser.InvalidInputException(&quot;invalid statement: topRelation(s) &lt; 0&quot;);</span>
+        }
+<span class="fc" id="L398">        final String relation = s.substring(i, i + 3);</span>
+<span class="fc" id="L399">        final Term subject = parseTerm(s.substring(0, i));</span>
+<span class="fc" id="L400">        final Term predicate = parseTerm(s.substring(i + 3));</span>
+<span class="fc" id="L401">        final Statement t = make(getRelation(relation), subject, predicate, false, 0);</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L403">            throw new Parser.InvalidInputException(&quot;invalid statement: statement unable to create: &quot; + getOperator(relation) + &quot; &quot; + subject + &quot; &quot; + predicate);</span>
+        }
+<span class="fc" id="L405">        return t;</span>
+    }
+
+    /**
+     * Parse a String to create a CompoundTerm.
+     *
+     * @return the Term generated from the String
+     * @param s0 The String to be parsed
+     *
+     * @throws Parser.InvalidInputException if the String couldn't get parsed to a term
+     */
+    private Term parseCompoundTerm(final String s0) throws Parser.InvalidInputException {
+<span class="fc" id="L417">        final String s = s0.trim();</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">        if (s.isEmpty()) {</span>
+<span class="nc" id="L419">            throw new Parser.InvalidInputException(&quot;Empty compound term: &quot; + s);</span>
+        }
+<span class="fc" id="L421">        final int firstSeparator = s.indexOf(ARGUMENT_SEPARATOR);</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">        if (firstSeparator == -1) {</span>
+<span class="nc" id="L423">            throw new Parser.InvalidInputException(&quot;Invalid compound term (missing ARGUMENT_SEPARATOR): &quot; + s);</span>
+        }
+                
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">        final String op = (firstSeparator &lt; 0) ? s : s.substring(0, firstSeparator).trim();</span>
+<span class="fc" id="L427">        final NativeOperator oNative = getOperator(op);</span>
+<span class="fc" id="L428">        final Operator oRegistered = memory.getOperator(op);</span>
+        
+<span class="pc bpc" id="L430" title="1 of 4 branches missed.">        if ((oRegistered==null) &amp;&amp; (oNative == null)) {</span>
+<span class="nc" id="L431">            throw new Parser.InvalidInputException(&quot;Unknown operator: &quot; + op);</span>
+        }
+
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">        final List&lt;Term&gt; arg = (firstSeparator &lt; 0) ? new ArrayList&lt;&gt;(0)</span>
+<span class="fc" id="L435">                : parseArguments(s.substring(firstSeparator + 1) + ARGUMENT_SEPARATOR);</span>
+
+<span class="fc" id="L437">        final Term[] argA = arg.toArray(new Term[0]);</span>
+        
+        final Term t;
+        
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        if (oNative!=null) {</span>
+<span class="fc" id="L442">            t = Terms.term(oNative, argA);</span>
+        }
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">        else if (oRegistered!=null) {</span>
+<span class="fc" id="L445">            t = make(oRegistered, argA, true);</span>
+        }
+        else {
+<span class="nc" id="L448">            throw new Parser.InvalidInputException(&quot;Invalid compound term&quot;);</span>
+        }
+        
+<span class="fc" id="L451">        return t;</span>
+    }
+
+    /**
+     * Parse a String into the argument get of a CompoundTerm.
+     *
+     * @return the arguments in an List
+     * @param s0 The String to be parsed
+     *
+     * @throws Parser.InvalidInputException if the String couldn't get parsed to a term
+     */
+    private List&lt;Term&gt; parseArguments(final String s0) throws Parser.InvalidInputException {
+<span class="fc" id="L463">        final String s = s0.trim();</span>
+<span class="fc" id="L464">        final List&lt;Term&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L465">        int start = 0;</span>
+<span class="fc" id="L466">        int end = 0;</span>
+        Term t;
+<span class="fc bfc" id="L468" title="All 2 branches covered.">        while (end &lt; s.length() - 1) {</span>
+<span class="fc" id="L469">            end = nextSeparator(s, start);</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">            if (end == start)</span>
+<span class="nc" id="L471">                break;</span>
+<span class="fc" id="L472">            t = parseTerm(s.substring(start, end));     // recursive call</span>
+<span class="fc" id="L473">            list.add(t);</span>
+<span class="fc" id="L474">            start = end + 1;</span>
+        }
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">        if (list.isEmpty()) {</span>
+<span class="nc" id="L477">            throw new Parser.InvalidInputException(&quot;null argument&quot;);</span>
+        }
+<span class="fc" id="L479">        return list;</span>
+    }
+
+    /* ---------- locate top-level substring ---------- */
+    /**
+     * Locate the first top-level separator in a CompoundTerm
+     *
+     * @return the index of the next seperator in a String
+     * @param s The String to be parsed
+     * @param first The starting index
+     */
+    private static int nextSeparator(final String s, final int first) {
+<span class="fc" id="L491">        int levelCounter = 0;</span>
+<span class="fc" id="L492">        int i = first;</span>
+<span class="fc bfc" id="L493" title="All 2 branches covered.">        while (i &lt; s.length() - 1) {</span>
+<span class="fc bfc" id="L494" title="All 2 branches covered.">            if (isOpener(s, i)) {</span>
+<span class="fc" id="L495">                levelCounter++;</span>
+<span class="fc bfc" id="L496" title="All 2 branches covered.">            } else if (isCloser(s, i)) {</span>
+<span class="fc" id="L497">                levelCounter--;</span>
+<span class="fc bfc" id="L498" title="All 2 branches covered.">            } else if (s.charAt(i) == ARGUMENT_SEPARATOR) {</span>
+<span class="fc bfc" id="L499" title="All 2 branches covered.">                if (levelCounter == 0) {</span>
+<span class="fc" id="L500">                    break;</span>
+                }
+            }
+<span class="fc" id="L503">            i++;</span>
+        }
+<span class="fc" id="L505">        return i;</span>
+    }
+
+    /**
+     * locate the top-level getRelation in a statement
+     *
+     * @return the index of the top-level getRelation
+     * @param s The String to be parsed
+     */
+    private static int topRelation(final String s) {      // need efficiency improvement
+<span class="fc" id="L515">        int levelCounter = 0;</span>
+<span class="fc" id="L516">        int i = 0;</span>
+<span class="pc bpc" id="L517" title="1 of 2 branches missed.">        while (i &lt; s.length() - 3) {    // don't need to check the last 3 characters</span>
+<span class="fc bfc" id="L518" title="All 4 branches covered.">            if ((levelCounter == 0) &amp;&amp; (isRelation(s.substring(i, i + 3)))) {</span>
+<span class="fc" id="L519">                return i;</span>
+            }
+<span class="fc bfc" id="L521" title="All 2 branches covered.">            if (isOpener(s, i)) {</span>
+<span class="fc" id="L522">                levelCounter++;</span>
+<span class="fc bfc" id="L523" title="All 2 branches covered.">            } else if (isCloser(s, i)) {</span>
+<span class="fc" id="L524">                levelCounter--;</span>
+            }
+<span class="fc" id="L526">            i++;</span>
+        }
+<span class="nc" id="L528">        return -1;</span>
+    }
+
+    /* ---------- recognize symbols ---------- */
+    /**
+     * Check CompoundTerm opener symbol
+     *
+     * @return if the given String is an opener symbol
+     * @param s The String to be checked
+     * @param i The starting index
+     */
+    private static boolean isOpener(final String s, final int i) {
+<span class="fc" id="L540">        final char c = s.charAt(i);</span>
+        
+<span class="fc bfc" id="L542" title="All 2 branches covered.">        final boolean b = (getOpener(c)!=null);</span>
+<span class="fc bfc" id="L543" title="All 2 branches covered.">        if (!b)</span>
+<span class="fc" id="L544">            return false;</span>
+        
+<span class="pc bpc" id="L546" title="2 of 4 branches missed.">        return i + 3 &gt; s.length() || !isRelation(s.substring(i, i + 3));</span>
+    }
+
+    /**
+     * Check CompoundTerm closer symbol
+     *
+     * @return if the given String is a closer symbol
+     * @param s The String to be checked
+     * @param i The starting index
+     */
+    private static boolean isCloser(final String s, final int i) {
+<span class="fc" id="L557">        final char c = s.charAt(i);</span>
+
+<span class="fc bfc" id="L559" title="All 2 branches covered.">        final boolean b = (getCloser(c)!=null);</span>
+<span class="fc bfc" id="L560" title="All 2 branches covered.">        if (!b)</span>
+<span class="fc" id="L561">            return false;</span>
+        
+<span class="pc bpc" id="L563" title="1 of 4 branches missed.">        return i &lt; 2 || !isRelation(s.substring(i - 2, i + 1));</span>
+    }
+
+    /**
+     * @param s string to get checked if it may be narsese
+     * @return returns if the string may be narsese
+     */
+    public static boolean possiblyNarsese(final String s) {
+<span class="nc bnc" id="L571" title="All 8 branches missed.">        return !s.contains(&quot;(&quot;) &amp;&amp; !s.contains(&quot;)&quot;) &amp;&amp; !s.contains(&quot;&lt;&quot;) &amp;&amp; !s.contains(&quot;&gt;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

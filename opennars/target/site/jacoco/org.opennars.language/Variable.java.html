@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Variable.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.language</a> &gt; <span class="el_source">Variable.java</span></div><h1>Variable.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.language;
+
+import org.opennars.io.Texts;
+import java.nio.CharBuffer;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import static org.opennars.io.Symbols.*;
+
+/**
+ * A variable term, which does not correspond to a concept
+ *
+ * @author Pei Wang
+ * @author Patrick Hammer
+ */
+public class Variable extends Term {
+    /** caches the type character for faster lookup than charAt(0) */
+<span class="fc" id="L41">    private char type = 0;</span>
+    
+    private Term scope;
+
+    private int hash;
+    
+
+    public Variable(final CharSequence name) {
+<span class="fc" id="L49">        this(name, null);        </span>
+<span class="fc" id="L50">    }</span>
+    
+    /**
+     * Constructor, from a given variable name
+     *
+     * @param name A String read from input
+     */
+    protected Variable(final CharSequence name, final Term scope) {
+<span class="fc" id="L58">        super();        </span>
+<span class="fc" id="L59">        setScope(scope, name);</span>
+<span class="fc" id="L60">    }</span>
+
+    public Variable setScope(final Term scope, final CharSequence n) {
+<span class="fc" id="L63">        this.setName(n);</span>
+<span class="fc" id="L64">        this.type = n.charAt(0);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        this.scope = scope != null ? scope : this;</span>
+<span class="fc" id="L66">        this.hash = 0; //calculate lazily</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (!validVariableType(type)) </span>
+<span class="nc" id="L68">            throw new IllegalStateException(&quot;Invalid variable type: &quot; + n);</span>
+<span class="fc" id="L69">        return this;</span>
+    }
+    
+    /**
+     * Clone a Variable
+     *
+     * @return The cloned Variable
+     */
+    @Override
+    public Variable clone() {
+<span class="fc" id="L79">        final Variable v = new Variable(name(), scope);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (scope == this)</span>
+<span class="fc" id="L81">            v.scope = v;</span>
+<span class="fc" id="L82">        return v;</span>
+    }
+
+    /**
+     * Get the type of the variable
+     *
+     * @return The variable type
+     */
+    public char getType() {
+<span class="fc" id="L91">        return type;</span>
+    }
+    
+
+    /**
+     * A variable is not constant
+     *
+     * @return false
+     */
+    @Override
+    public boolean isConstant() {
+<span class="nc" id="L102">        return false;</span>
+    }
+
+    /**
+     * The syntactic complexity of a variable is 0, because it does not refer to
+     * any concept.
+     *
+     * @return The complexity of the term, an integer
+     */
+    @Override public short getComplexity() {
+<span class="fc" id="L112">        return 0;</span>
+    }
+
+
+    @Override public boolean hasVar() {
+<span class="fc" id="L117">        return true;</span>
+    }
+    @Override public boolean hasVarIndep() {
+<span class="fc" id="L120">        return isIndependentVariable();</span>
+    }
+    @Override public boolean hasVarDep() {
+<span class="fc" id="L123">        return isDependentVariable();</span>
+    }
+    @Override public boolean hasVarQuery() {
+<span class="fc" id="L126">        return isQueryVariable();</span>
+    }
+    
+
+    @Override public boolean equals(final Object that) {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (that == this) {</span>
+<span class="fc" id="L132">            return true;</span>
+        }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (!(that instanceof Variable)) { </span>
+<span class="fc" id="L135">            return false;</span>
+        }
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if(!super.equals(that)) {</span>
+<span class="fc" id="L138">            return false;</span>
+        }
+<span class="fc" id="L140">        final Variable v = (Variable)that;</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (!name().equals(v.name())) {</span>
+<span class="nc" id="L142">            return false;</span>
+        }
+<span class="pc bpc" id="L144" title="1 of 4 branches missed.">        if ((getScope() == this &amp;&amp; v.getScope() != v) ||</span>
+<span class="pc bpc" id="L145" title="1 of 4 branches missed.">            (getScope() != this &amp;&amp; v.getScope() == v)) {</span>
+<span class="nc" id="L146">            return false;</span>
+        }
+<span class="fc" id="L148">        return (v.getScope().name().equals(getScope().name()));</span>
+    }
+    
+    public boolean equalsTerm(final Object that) {
+        //TODO factor these comparisons into 2 nested if's
+<span class="nc" id="L153">        final Variable v = (Variable)that;</span>
+<span class="nc bnc" id="L154" title="All 4 branches missed.">        if ((v.scope == v) &amp;&amp; (scope == this))</span>
+            //both are unscoped, so compare by name only
+<span class="nc" id="L156">            return name().equals(v.name());</span>
+<span class="nc bnc" id="L157" title="All 4 branches missed.">        else if ((v.scope!=v) &amp;&amp; (scope==this))</span>
+<span class="nc" id="L158">            return false;</span>
+<span class="nc bnc" id="L159" title="All 4 branches missed.">        else if ((v.scope==v) &amp;&amp; (scope!=this))</span>
+<span class="nc" id="L160">            return false;</span>
+        else {
+<span class="nc bnc" id="L162" title="All 2 branches missed.">            if (!name().equals(v.name()))</span>
+<span class="nc" id="L163">                return false;</span>
+
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            if (scope == v.scope) return true;</span>
+
+<span class="nc bnc" id="L167" title="All 2 branches missed.">            if (scope.hashCode()!=v.scope.hashCode())</span>
+<span class="nc" id="L168">                return false;</span>
+
+            //WARNING infinnite loop can happen if the two scopes start equaling echother
+            //we need a special equals comparison which ignores variable scope when recursively
+            //called from this
+            //until then, we'll use the name for comparison because it wont 
+            //invoke infinite recursion
+
+<span class="nc" id="L176">            return scope.name().equals(v.scope.name());       </span>
+        }
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (hash == 0) {</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (scope!=this)</span>
+<span class="fc" id="L184">                this.hash = 31 * name().hashCode() + scope.hashCode();</span>
+            else
+<span class="fc" id="L186">                this.hash = name().hashCode();</span>
+        }
+<span class="fc" id="L188">        return hash;</span>
+    }
+
+    @Override
+    public int compareTo(final AbstractTerm that) {
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if(this == that) {</span>
+<span class="fc" id="L194">            return 0;</span>
+        }
+<span class="fc" id="L196">        final int superCmp = super.compareTo(that);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if(superCmp != 0) {</span>
+<span class="fc" id="L198">            return superCmp;</span>
+        }
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if(!(that instanceof Variable)) {</span>
+<span class="nc" id="L201">            return 0;</span>
+        }
+
+<span class="fc" id="L204">        final Variable thatVar = (Variable) that;</span>
+<span class="fc" id="L205">        final int nameCmp = String.valueOf(this.name()).compareTo(String.valueOf(thatVar.name()));</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if( nameCmp != 0 ) {</span>
+<span class="nc" id="L207">            return nameCmp;</span>
+        }
+<span class="pc bpc" id="L209" title="3 of 4 branches missed.">        if(this.getScope() == this &amp;&amp; thatVar.getScope() != thatVar) {</span>
+<span class="nc" id="L210">            return 1;</span>
+        }
+<span class="pc bpc" id="L212" title="2 of 4 branches missed.">        if(this.getScope() != this &amp;&amp; thatVar.getScope() == thatVar) {</span>
+<span class="nc" id="L213">            return -1;</span>
+        }
+<span class="fc" id="L215">        return String.valueOf(this.getScope().name()).compareTo(String.valueOf(thatVar.getScope().name()));</span>
+    }
+
+    /*
+     * variable terms are listed first alphabetically
+     *
+     * @param that The Term to be compared with the current Term
+     * @return The same as compareTo as defined on Strings
+     */
+    /*@Override
+    public final int compareTo(final AbstractTerm that) {
+        return (that instanceof Variable) ? ((Comparable)name()).compareTo(that.name()) : -1;
+    }*/
+
+<span class="fc bfc" id="L229" title="All 2 branches covered.">    boolean isQueryVariable() { return getType() == VAR_QUERY;    }</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">    boolean isDependentVariable() { return getType() == VAR_DEPENDENT;    }</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">    boolean isIndependentVariable() { return getType() == VAR_INDEPENDENT;    }</span>
+
+    boolean isCommon() {     
+<span class="fc" id="L234">        final CharSequence n = name();</span>
+<span class="fc" id="L235">        final int l = n.length();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        return n.charAt(l - 1) == '$';</span>
+    }
+
+    public Term getScope() {
+<span class="fc" id="L240">        return scope;</span>
+    }
+    
+    //ported back from 1.7, sehs addition
+    public static int compare(final Variable a, final Variable b) {
+        //int i = a.name().compareTo(b.name());
+<span class="nc" id="L246">        final int i=Texts.compareTo(a.name(), b.name());</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        if (i == 0) {</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">            final boolean ascoped = a.scope!=a;</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">            final boolean bscoped = b.scope!=b;</span>
+<span class="nc bnc" id="L250" title="All 4 branches missed.">            if (!ascoped &amp;&amp; !bscoped) {</span>
+                //if the two variables are each without scope, they are not equal.
+                //so use their identityHashCode to determine a stable ordering
+<span class="nc" id="L253">                final int as = System.identityHashCode(a.scope);</span>
+<span class="nc" id="L254">                final int bs = System.identityHashCode(b.scope);</span>
+<span class="nc" id="L255">                return Integer.compare(as, bs);</span>
+            }
+<span class="nc bnc" id="L257" title="All 4 branches missed.">            else if (ascoped &amp;&amp; !bscoped) {</span>
+<span class="nc" id="L258">                return -1;</span>
+            }
+<span class="nc bnc" id="L260" title="All 4 branches missed.">            else if (bscoped &amp;&amp; !ascoped) {</span>
+<span class="nc" id="L261">             return 1;</span>
+            }
+            else {
+<span class="nc" id="L264">                return Texts.compareTo(a.getScope().name(), b.getScope().name());</span>
+               // return Texts.compare(a.getScope().name(), b.getScope().name());
+           }
+        }
+<span class="nc" id="L268">        return i;</span>
+    }
+
+
+    public static boolean validVariableType(final char c) {
+<span class="pc bpc" id="L273" title="1 of 6 branches missed.">        return (c == VAR_QUERY) || (c == VAR_DEPENDENT) || (c == VAR_INDEPENDENT);</span>
+    }
+    
+    private static final int MAX_CACHED_VARNAME_INDEXES = 64;
+<span class="fc" id="L277">    private static final CharSequence[] vn1 = new CharSequence[MAX_CACHED_VARNAME_INDEXES];</span>
+<span class="fc" id="L278">    private static final CharSequence[] vn2 = new CharSequence[MAX_CACHED_VARNAME_INDEXES];</span>
+<span class="fc" id="L279">    private static final CharSequence[] vn3 = new CharSequence[MAX_CACHED_VARNAME_INDEXES];</span>
+    
+    
+    public static CharSequence getName(final char type, final int index) {
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (index &gt; MAX_CACHED_VARNAME_INDEXES)</span>
+<span class="nc" id="L284">            return newName(type, index);</span>
+        
+        
+        final CharSequence[] cache;
+<span class="pc bpc" id="L288" title="1 of 4 branches missed.">        switch (type) {</span>
+<span class="fc" id="L289">            case VAR_INDEPENDENT: cache = vn1; break;</span>
+<span class="fc" id="L290">            case VAR_DEPENDENT: cache = vn2; break;</span>
+<span class="fc" id="L291">            case VAR_QUERY: cache = vn3; break;</span>
+            default:
+<span class="nc" id="L293">                throw new IllegalStateException(&quot;Invalid variable type&quot;);</span>
+        }
+        
+<span class="fc" id="L296">        CharSequence c = cache[index];</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (c == null) {</span>
+<span class="fc" id="L298">            c = newName(type, index);</span>
+<span class="fc" id="L299">            cache[index] = c;</span>
+        }
+            
+<span class="fc" id="L302">        return c;</span>
+    }
+    
+    protected static CharSequence newName(final char type, int index) {
+        
+<span class="pc bpc" id="L307" title="1 of 4 branches missed.">        final int digits = (index &gt;= 256 ? 3 : ((index &gt;= 16) ? 2 : 1));</span>
+<span class="fc" id="L308">        final CharBuffer cb  = CharBuffer.allocate(1 + digits).append(type);</span>
+        do {
+<span class="fc" id="L310">            cb.append(  Character.forDigit(index % 16, 16) ); index /= 16;</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        } while (index != 0);</span>
+<span class="fc" id="L312">        return cb.compact().toString();</span>
+    }
+    
+    @Override
+    public Map&lt;Term, Integer&gt; countTermRecursively(Map&lt;Term,Integer&gt; map) { 
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if(map == null) {</span>
+<span class="fc" id="L318">            map = new LinkedHashMap&lt;Term, Integer&gt;();</span>
+        }
+<span class="fc" id="L320">        return map; //don't count vars</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

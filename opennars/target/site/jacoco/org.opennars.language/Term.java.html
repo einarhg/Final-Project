@@ -1,0 +1,457 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Term.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.language</a> &gt; <span class="el_source">Term.java</span></div><h1>Term.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.language;
+
+import org.apache.commons.lang3.StringUtils;
+import org.opennars.inference.TemporalRules;
+import org.opennars.io.Symbols;
+import org.opennars.io.Symbols.NativeOperator;
+import org.opennars.io.Texts;
+import org.opennars.main.Debug;
+import org.opennars.operator.ImaginationSpace;
+import org.opennars.operator.Operation;
+import org.opennars.operator.Operator;
+import org.opennars.storage.Memory;
+
+import java.io.Serializable;
+import java.util.*;
+//import org.opennars.util.sort.SortedList;
+
+/**
+ * Term is the basic component of Narsese, and the object of processing in NARS.
+ * &lt;p&gt;
+ * A Term may have an associated Concept containing relations with other Terms.
+ * It is not linked in the Term, because a Concept may be forgot while the Term
+ * exists. Multiple objects may represent the same Term.
+ *
+ * @author Pei Wang
+ * @author Patrick Hammer
+ */
+public class Term implements AbstractTerm, Serializable {
+    public ImaginationSpace imagination;
+<span class="fc" id="L53">    private static final Map&lt;CharSequence,Term&gt; atoms = new LinkedHashMap();</span>
+
+<span class="fc" id="L55">    final public static Term SELF = SetExt.make(Term.get(&quot;SELF&quot;));</span>
+<span class="fc" id="L56">    final public static Term SEQ_SPATIAL = Term.get(&quot;#&quot;);</span>
+<span class="fc" id="L57">    final public static Term SEQ_TEMPORAL = Term.get(&quot;&amp;/&quot;);</span>
+
+    // private to cache it
+<span class="fc" id="L60">    private CharSequence name = null;</span>
+
+    final public static boolean isSelf(final Term t) {
+<span class="nc" id="L63">        return SELF.equals(t);</span>
+    }
+
+    public NativeOperator operator() {
+<span class="nc" id="L67">        return NativeOperator.ATOM;</span>
+    }
+    
+    public boolean isHigherOrderStatement() { //==&gt; &lt;=&gt;
+<span class="pc bpc" id="L71" title="1 of 4 branches missed.">        return (this instanceof Equivalence) || (this instanceof Implication);</span>
+    }
+    
+    public boolean isExecutable(final Memory mem) {
+        //don't allow ^want and ^believe to be active/have an effect, 
+        //which means its only used as monitor
+<span class="fc" id="L77">        final boolean isOp=this instanceof Operation;</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if(isOp) {</span>
+<span class="fc" id="L79">            final Operator op=((Operation)this).getOperator(); //the following part may be refactored after we</span>
+            //know more about how the NAL9 concepts should really interact together:
+            /*if(op.equals(mem.getOperator(&quot;^want&quot;)) || op.equals(mem.getOperator(&quot;^believe&quot;))) {
+                return false;
+            }*/
+        }
+<span class="fc" id="L85">        return isOp;</span>
+    }
+
+
+    public interface TermVisitor {
+        void visit(Term t, Term superterm);
+    }
+    
+    
+    
+
+    /**
+     * Default constructor that build an internal Term
+     */
+<span class="fc" id="L99">    protected Term() {</span>
+<span class="fc" id="L100">    }</span>
+
+    /**
+     * Constructor with a given name
+     *
+     * @param name A String as the name of the Term
+     */
+<span class="fc" id="L107">    public Term(final CharSequence name) {</span>
+<span class="fc" id="L108">        setName(name);</span>
+<span class="fc" id="L109">    }</span>
+    
+    /** gets the atomic term given a name */
+    public final static Term get(final CharSequence name) {
+<span class="fc" id="L113">        Term x = atoms.get(name); //only</span>
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">        if (x != null &amp;&amp; !x.toString().endsWith(&quot;]&quot;)) { //return only if it isn't an index term</span>
+<span class="fc" id="L115">            return x;</span>
+        }
+
+<span class="fc" id="L118">        final String namestr = name.toString();</span>
+        //p[s,i,j]
+<span class="fc" id="L120">        int[] term_indices = null;</span>
+<span class="fc" id="L121">        String before_indices_str = null;</span>
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">        if(namestr.endsWith(&quot;]&quot;) &amp;&amp; namestr.contains(&quot;[&quot;)) { //simple check, failing for most terms</span>
+<span class="fc" id="L123">            String indices_str = namestr.split(&quot;\\[&quot;)[1].split(&quot;\\]&quot;)[0];</span>
+<span class="fc" id="L124">            before_indices_str = namestr.split(&quot;\\[&quot;)[0];</span>
+<span class="fc" id="L125">            String[] inds = indices_str.split(&quot;,&quot;);</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            if(inds.length == 2) { //only position info given</span>
+<span class="fc" id="L127">                indices_str=&quot;1,1,&quot;+indices_str;</span>
+<span class="fc" id="L128">                inds = indices_str.split(&quot;,&quot;);</span>
+            }
+<span class="fc" id="L130">            term_indices = new int[inds.length];</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            for(int i=0;i&lt;inds.length;i++) {</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                if(StringUtils.isNumeric(inds[i]))</span>
+<span class="fc" id="L133">                    term_indices[i] = Integer.valueOf(inds[i]);</span>
+                else {
+<span class="fc" id="L135">                    term_indices = null;</span>
+<span class="fc" id="L136">                    break;</span>
+                }
+            }
+        }
+        
+<span class="fc" id="L141">        CharSequence name2 = name;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if(term_indices != null) { //only on conceptual level not</span>
+<span class="fc" id="L143">            name2 = before_indices_str + &quot;[i,j,k,l]&quot;;</span>
+        }
+<span class="fc" id="L145">        x = new Term(name2);</span>
+<span class="fc" id="L146">        x.term_indices = term_indices;</span>
+<span class="fc" id="L147">        x.index_variable = before_indices_str;</span>
+<span class="fc" id="L148">        atoms.put(name2, x);</span>
+        
+<span class="fc" id="L150">        return x;</span>
+    }
+    
+    /** gets the atomic term of an integer */
+    public final static Term get(final int i) {
+<span class="fc" id="L155">        return get(Integer.toString(i));</span>
+    }
+    
+
+    /**
+     * Reporting the name of the current Term.
+     *
+     * @return The name of the term as a String
+     */
+    @Override
+    public CharSequence name() {
+<span class="fc" id="L166">        return nameInternal();</span>
+    }
+
+    protected CharSequence nameInternal() {
+<span class="fc" id="L170">        return name;</span>
+    }
+    
+<span class="fc" id="L173">    public int[] term_indices = null;</span>
+<span class="fc" id="L174">    public String index_variable = &quot;&quot;;</span>
+
+    /**
+     * Make a new Term with the same name.
+     *
+     * @return The new Term
+     */
+    @Override
+    public Term clone() {
+<span class="fc" id="L183">        final Term t = new Term();</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if(term_indices != null) {</span>
+<span class="nc" id="L185">            t.term_indices = term_indices.clone();</span>
+<span class="nc" id="L186">            t.index_variable = index_variable;</span>
+        }
+<span class="fc" id="L188">        t.setName(name());</span>
+<span class="fc" id="L189">        t.imagination = imagination;</span>
+<span class="fc" id="L190">        return t;</span>
+    }
+    
+    public Term cloneDeep() {
+<span class="fc" id="L194">        return clone();</span>
+    }
+
+    /**
+     * Equal terms have identical name, though not necessarily the same
+     * reference.
+     *
+     * @return Whether the two Terms are equal
+     * @param that The Term to be compared with the current Term
+     */
+    @Override
+    public boolean equals(final Object that) {
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (that == this) return true;</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (getClass() != this.getClass()) return false; //optimization, if complexity is different they cant be equal</span>
+<span class="fc bfc" id="L208" title="All 4 branches covered.">        return this.getComplexity() == ((Term) that).getComplexity() &amp;&amp; name().equals(((Term)that).name());</span>
+    }
+
+    /**
+     * Produce a hash code for the term
+     *
+     * @return An integer hash code
+     */
+    @Override
+    public int hashCode() {
+<span class="fc" id="L218">        return name().hashCode();</span>
+    }
+
+    /**
+     * Check whether the current Term can name a Concept.
+     * isConstant means if the term contains free variable
+     * True if:
+     *   has zero variables, or
+     *   uses several instances of the same variable
+     * False if it uses one instance of a variable (&quot;free&quot; like a &quot;free radical&quot; in chemistry).
+     * Therefore it may be considered Constant, yet actually contain variables.
+     * 
+     * @return A Term is constant by default
+     */
+    @Override
+    public boolean isConstant() {        
+<span class="nc" id="L234">        return true;</span>
+    }
+    
+    public int getTemporalOrder() {
+<span class="fc" id="L238">        return TemporalRules.ORDER_NONE;</span>
+    }
+    
+    public boolean getIsSpatial() {
+<span class="fc" id="L242">        return false;</span>
+    }
+
+    public void recurseTerms(final TermVisitor v, final Term parent) {
+<span class="fc" id="L246">        v.visit(this, parent);</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (this instanceof CompoundTerm) {            </span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            for (final Term t : ((CompoundTerm)this).term) {</span>
+<span class="fc" id="L249">                t.recurseTerms(v, this);</span>
+            }
+        }
+<span class="fc" id="L252">    }</span>
+    
+    public void recurseSubtermsContainingVariables(final TermVisitor v) {
+<span class="fc" id="L255">        recurseTerms(v, null);</span>
+<span class="fc" id="L256">    }</span>
+    
+    public void recurseSubtermsContainingVariables(final TermVisitor v, final Term parent) {
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (!hasVar()) return;</span>
+<span class="nc" id="L260">        v.visit(this, parent);</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">        if (this instanceof CompoundTerm) {</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">            for (final Term t : ((CompoundTerm)this).term) {</span>
+<span class="nc" id="L263">                t.recurseSubtermsContainingVariables(v, this);</span>
+            }
+        }
+<span class="nc" id="L266">    }</span>
+         
+    /**
+     * @return The complexity of the term, an integer
+     */
+    // the syntactic complexity, for constant atomic Term, is 1
+    public short getComplexity() {
+<span class="fc" id="L273">        return 1;</span>
+    }
+
+    /** set the name
+     */
+    // only method that should modify Term.name
+    protected void setName(final CharSequence newName) {
+<span class="fc" id="L280">        this.name = newName;</span>
+<span class="fc" id="L281">    }</span>
+    
+    /**
+     * @param that The Term to be compared with the current Term
+     * @return The same as compareTo as defined on Strings
+     */
+    @Override
+    public int compareTo(final AbstractTerm that) {
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (that==this) {</span>
+<span class="fc" id="L290">            return 0;</span>
+        }
+        //previously: Orders among terms: variable &lt; atomic &lt; compound
+<span class="fc bfc" id="L293" title="All 4 branches covered.">        if ((that instanceof Variable) &amp;&amp; (getClass()!=Variable.class)) {</span>
+<span class="fc" id="L294">            return 1;</span>
+        }
+<span class="fc bfc" id="L296" title="All 4 branches covered.">        else if ((this instanceof Variable) &amp;&amp; (that.getClass()!=Variable.class)) {</span>
+<span class="fc" id="L297">            return -1;</span>
+        }
+<span class="fc" id="L299">        return Texts.compareTo(name(), that.name());            </span>
+    }
+
+    
+    
+    public int containedTemporalRelations() {
+<span class="fc" id="L305">        return 0;</span>
+    }
+    
+    /**
+     * Recursively check if a compound contains a term
+     *
+     * @param target The term to be searched
+     * @return Whether the two have the same content
+     */
+    public boolean containsTermRecursively(final Term target) {
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if(target==null) {</span>
+<span class="nc" id="L316">            return false;</span>
+        }
+<span class="fc" id="L318">        return equals(target);</span>
+    }
+    
+    /**
+     * Recursively count how often the terms are contained
+     *
+     * @param map The count map that will be created to count how often each term occurs
+     * @return The counts of the terms
+     */
+    public Map&lt;Term, Integer&gt; countTermRecursively(Map&lt;Term,Integer&gt; map) { 
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if(map == null) {</span>
+<span class="nc" id="L329">            map = new LinkedHashMap&lt;Term, Integer&gt;();</span>
+        }
+<span class="fc" id="L331">        map.put(this, map.getOrDefault(this, 0) + 1);</span>
+<span class="fc" id="L332">        return map;</span>
+    }
+
+    /** whether this contains a term in its components. */
+    public boolean containsTerm(final Term target) {
+<span class="fc" id="L337">        return equals(target);</span>
+    }
+
+    /**
+     * The same as getName by default, used in display only.
+     *
+     * @return The name of the term as a String
+     */
+    @Override
+    public final String toString() {
+<span class="fc" id="L347">        return name().toString();</span>
+    }
+
+    /** Creates a quote-escaped term from a string. Useful for an atomic term that is meant to contain a message as its name */
+    public static Term text(final String t) {
+<span class="nc" id="L352">        return Term.get(&quot;\&quot;&quot; + t + &quot;\&quot;&quot;);</span>
+    }
+
+
+    /**
+     * Whether this compound term contains any variable term
+     *
+     * @return Whether the name contains a variable
+     */
+    @Override public boolean hasVar() {
+<span class="fc" id="L362">        return false;</span>
+    }
+    
+    public boolean hasVar(final char type) {
+<span class="pc bpc" id="L366" title="1 of 4 branches missed.">        switch (type) {</span>
+<span class="fc" id="L367">            case Symbols.VAR_DEPENDENT: return hasVarDep();</span>
+<span class="fc" id="L368">            case Symbols.VAR_INDEPENDENT: return hasVarIndep();</span>
+<span class="fc" id="L369">            case Symbols.VAR_QUERY: return hasVarQuery();</span>
+        }
+<span class="nc" id="L371">        throw new IllegalStateException(&quot;Invalid variable type: &quot; + type);</span>
+    }
+    
+    public boolean hasVarIndep() {
+<span class="fc" id="L375">        return false;</span>
+    }
+    
+    public boolean hasInterval() {
+<span class="fc" id="L379">        return false;</span>
+    }
+
+    public boolean hasVarDep() {
+<span class="fc" id="L383">        return false;</span>
+    }
+
+    public boolean hasVarQuery() {
+<span class="fc" id="L387">        return false;</span>
+    }
+
+    public static NavigableSet&lt;Term&gt; toSortedSet(final Term... arg) {
+        //use toSortedSetArray where possible
+<span class="fc" id="L392">        final NavigableSet&lt;Term&gt; t = new TreeSet();</span>
+<span class="fc" id="L393">        Collections.addAll(t, arg);</span>
+<span class="fc" id="L394">        return t;        </span>
+    }
+    
+<span class="fc" id="L397">    public final static Term[] EmptyTermArray = new Term[0];</span>
+    
+    public static Term[] toSortedSetArray(final Term... arg) {
+<span class="fc bfc" id="L400" title="All 4 branches covered.">        switch (arg.length) {</span>
+<span class="fc" id="L401">            case 0: return EmptyTermArray;                </span>
+<span class="fc" id="L402">            case 1: return new Term[] { arg[0] };</span>
+            case 2: 
+<span class="fc" id="L404">                final Term a = arg[0];</span>
+<span class="fc" id="L405">                final Term b = arg[1];</span>
+<span class="fc" id="L406">                final int c = a.compareTo(b);</span>
+
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">                if (Debug.DETAILED) {</span>
+                    //verify consistency of compareTo() and equals()
+<span class="nc" id="L410">                    final boolean equal = a.equals(b);</span>
+<span class="nc bnc" id="L411" title="All 8 branches missed.">                    if ((equal &amp;&amp; (c!=0)) || (!equal &amp;&amp; (c==0))) {</span>
+<span class="nc" id="L412">                        throw new IllegalStateException(&quot;invalid order: &quot; + a + &quot; = &quot; + b);</span>
+                    }
+                }
+
+<span class="fc bfc" id="L416" title="All 2 branches covered.">                if (c &lt; 0) return new Term[] { a, b };</span>
+<span class="fc bfc" id="L417" title="All 2 branches covered.">                else if (c &gt; 0) return new Term[] { b, a };</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">                else if (c == 0) return new Term[] { a }; //equal</span>
+                
+        }
+        
+        //TODO fast sorted array for arg.length == 3
+
+        //terms &gt; 2:        
+<span class="fc" id="L425">        final NavigableSet&lt;Term&gt; s = new TreeSet();</span>
+        //SortedList&lt;Term&gt; s = new SortedList(arg.length);
+        //s.setAllowDuplicate(false);
+
+<span class="fc" id="L429">        Collections.addAll(s, arg);</span>
+        
+<span class="fc" id="L431">        return s.toArray(new Term[0]);</span>
+    }
+
+    /** performs a thorough check of the validity of a term (by cloneDeep it) to see if it's valid */
+    public static boolean valid(final Term content) {
+<span class="nc" id="L436">        final Term cloned = content.cloneDeep();</span>
+<span class="nc bnc" id="L437" title="All 2 branches missed.">        return cloned != null;</span>
+    }
+
+    public boolean subjectOrPredicateIsIndependentVar() {
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        if(this instanceof Statement) {</span>
+<span class="fc" id="L442">            final Statement cont=(Statement)this;</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">            if(cont.getSubject() instanceof Variable) {</span>
+<span class="fc" id="L444">                final Variable v=(Variable) cont.getSubject();</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">                if(v.hasVarIndep()) {</span>
+<span class="fc" id="L446">                    return true;</span>
+                }
+            }
+<span class="fc bfc" id="L449" title="All 2 branches covered.">            if(cont.getPredicate()instanceof Variable) {</span>
+<span class="fc" id="L450">                final Variable v=(Variable) cont.getPredicate();</span>
+<span class="fc" id="L451">                return v.hasVarIndep();</span>
+            }
+        }
+<span class="fc" id="L454">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

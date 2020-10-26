@@ -1,0 +1,497 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TruthFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.inference</a> &gt; <span class="el_source">TruthFunctions.java</span></div><h1>TruthFunctions.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.inference;
+
+import org.opennars.entity.TruthValue;
+
+import static java.lang.Math.abs;
+import org.opennars.main.Parameters;
+
+/**
+ * All truth-value (and desire-value) functions used in inference rules
+ *
+ * @author Pei Wang
+ * @author Patrick Hammer
+ * @author Robert Wünsche
+ */
+<span class="nc" id="L38">public final class TruthFunctions extends UtilityFunctions {</span>
+<span class="fc" id="L39">    public enum EnumType {</span>
+<span class="fc" id="L40">        DESIREDED,</span>
+<span class="fc" id="L41">        DESIREIND,</span>
+<span class="fc" id="L42">        DESIREWEAK,</span>
+<span class="fc" id="L43">        DESIRESTRONG,</span>
+<span class="fc" id="L44">        COMPARISON,</span>
+<span class="fc" id="L45">        ANALOGY,</span>
+<span class="fc" id="L46">        ANONYMOUSANALOGY,</span>
+<span class="fc" id="L47">        DEDUCTION,</span>
+<span class="fc" id="L48">        EXEMPLIFICATION,</span>
+<span class="fc" id="L49">        ABDUCTION,</span>
+<span class="fc" id="L50">        RESEMBLENCE,</span>
+<span class="fc" id="L51">        REDUCECONJUNCTION,</span>
+<span class="fc" id="L52">        REDUCEDISJUNCTION,</span>
+<span class="fc" id="L53">        REDUCEDISJUNCTIONREV,</span>
+<span class="fc" id="L54">        REDUCECONJUNCTIONNEG,</span>
+    }
+
+    /**
+     * lookup the truth function and compute the value
+     * @param type truth-function
+     * @param a truth value of the first premise
+     * @param b truth value of the second premise
+     * @return truth value as computed by the truth-function
+     */
+    public static TruthValue lookupTruthFunctionAndCompute(final EnumType type, final TruthValue a, final TruthValue b, final Parameters narParameters) {
+<span class="pc bpc" id="L65" title="9 of 16 branches missed.">        switch(type) {</span>
+<span class="fc" id="L66">            case DESIREDED: return desireDed(a, b, narParameters);</span>
+<span class="fc" id="L67">            case DESIREIND: return desireInd(a, b, narParameters);</span>
+<span class="fc" id="L68">            case DESIREWEAK: return desireWeak(a, b, narParameters);</span>
+<span class="fc" id="L69">            case DESIRESTRONG: return desireStrong(a, b, narParameters);</span>
+<span class="nc" id="L70">            case COMPARISON: return comparison(a, b, narParameters);</span>
+<span class="fc" id="L71">            case ANALOGY: return analogy(a, b, narParameters);</span>
+<span class="nc" id="L72">            case ANONYMOUSANALOGY: return anonymousAnalogy(a, b, narParameters);</span>
+<span class="nc" id="L73">            case DEDUCTION: return deduction(a, b, narParameters);</span>
+<span class="nc" id="L74">            case EXEMPLIFICATION: return exemplification(a, b, narParameters);</span>
+<span class="nc" id="L75">            case ABDUCTION: return abduction(a, b, narParameters);</span>
+<span class="nc" id="L76">            case RESEMBLENCE: return resemblance(a, b, narParameters);</span>
+<span class="fc" id="L77">            case REDUCECONJUNCTION: return reduceConjunction(a, b, narParameters);</span>
+<span class="fc" id="L78">            case REDUCEDISJUNCTION: return reduceDisjunction(a, b, narParameters);</span>
+<span class="nc" id="L79">            case REDUCEDISJUNCTIONREV: return reduceDisjunction(b, a, narParameters);</span>
+<span class="nc" id="L80">            case REDUCECONJUNCTIONNEG: return reduceConjunctionNeg(a, b, narParameters);</span>
+<span class="nc" id="L81">            default: throw new IllegalArgumentException(&quot;Encountered unimplemented case!&quot;); // internal error</span>
+        }
+    }
+
+    /**
+     * lookup the truth function and compute the value - for two truth functions which are decided by flag
+     * @param flag which type to choose
+     * @param typeTrue truth-function for the case when the flag is true
+     * @param typeFalse truth-function for the case when the flag is false
+     * @param a truth value of the first premise
+     * @param b truth value of the second premise
+     * @return truth value as computed by the truth-function
+     */
+    public static TruthValue lookupTruthFunctionByBoolAndCompute(final boolean flag, final EnumType typeTrue, final EnumType typeFalse, final TruthValue a, final TruthValue b, Parameters narParameters) {
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        final EnumType type = flag ? typeTrue : typeFalse;</span>
+<span class="fc" id="L96">        return lookupTruthFunctionAndCompute(type, a, b, narParameters);</span>
+    }
+
+    /**
+     * lookup the truth function by the first boolean which is true or return null if no boolean is true
+     * @param values tuples of boolean conditional values and their corresponding truth function
+     * @param a truth value of the first premise
+     * @param b truth value of the second premise
+     * @return truth value as computed by the truth-function or null if no boolean value was true
+     */
+    public static TruthValue lookupTruthOrNull(final TruthValue a, final TruthValue b, Parameters narParameters, final Object... values) {
+<span class="fc" id="L107">        final int numberOfTuples = (values.length) / 2;</span>
+
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for(int idx = 0; idx &lt; numberOfTuples; idx++) {</span>
+<span class="fc" id="L110">            final boolean v = (boolean)values[idx*2];</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if( v ) {</span>
+<span class="fc" id="L112">                final EnumType type = (EnumType)values[idx*2+1];</span>
+<span class="fc" id="L113">                return lookupTruthFunctionAndCompute(type, a, b, narParameters);</span>
+            }
+        }
+
+<span class="fc" id="L117">        return null;</span>
+    }
+
+
+    /* ----- Single argument functions, called in MatchingRules ----- */
+    /**
+     * {&amp;lt;A ==&amp;gt; B&amp;gt;} |- &amp;lt;B ==&amp;gt; A&amp;gt;
+     * @param v1 Truth value of the premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue conversion(final TruthValue v1, Parameters narParameters) {
+<span class="fc" id="L128">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L129">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L130">        final float w = (float)and(f1, c1);</span>
+<span class="fc" id="L131">        final double c = w2c(w, narParameters);</span>
+<span class="fc" id="L132">        return new TruthValue(1, c, narParameters);</span>
+    }
+
+    /* ----- Single argument functions, called in StructuralRules ----- */
+    /**
+     * {A} |- (--A)
+     * @param v1 Truth value of the premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue negation(final TruthValue v1, Parameters narParameters) {
+<span class="fc" id="L142">        final float f = 1 - v1.getFrequency();</span>
+<span class="fc" id="L143">        final double c = v1.getConfidence();</span>
+<span class="fc" id="L144">        return new TruthValue(f, c, narParameters);</span>
+    }
+
+    /**
+     * {&amp;lt;A ==&amp;gt; B&amp;gt;} |- &amp;lt;(--, B) ==&amp;gt; (--, A)&amp;gt;
+     * @param v1 Truth value of the premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue contraposition(final TruthValue v1, Parameters narParameters) {
+<span class="fc" id="L153">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L154">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L155">        final float w = (float)and(1 - (double)f1, c1);</span>
+<span class="fc" id="L156">        final double c = w2c(w, narParameters);</span>
+<span class="fc" id="L157">        return new TruthValue(0, c, narParameters);</span>
+    }
+
+    /* ----- double argument functions, called in MatchingRules ----- */
+    /**
+     * {&amp;lt;S ==&amp;gt; P&amp;gt;, &amp;lt;S ==&amp;gt; P&amp;gt;} |- &amp;lt;S ==&amp;gt; P&amp;gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue revision(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L168">        return revision(v1, v2, new TruthValue(narParameters), narParameters);</span>
+    }
+    
+    private static final TruthValue revision(final TruthValue v1, final TruthValue v2, final TruthValue result, Parameters narParameters) {
+<span class="fc" id="L172">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L173">        final float f2 = v2.getFrequency();</span>
+<span class="fc" id="L174">        final double w1 = c2w( v1.getConfidence(), narParameters );</span>
+<span class="fc" id="L175">        final double w2 = c2w( v2.getConfidence(), narParameters );</span>
+<span class="fc" id="L176">        final double w = w1 + w2;</span>
+<span class="fc" id="L177">        result.setFrequency( (float)((w1 * f1 + w2 * f2) / w) );</span>
+<span class="fc" id="L178">        result.setConfidence( w2c(w, narParameters) );</span>
+<span class="fc" id="L179">        return result;</span>
+    }
+    
+    /* ----- double argument functions, called in SyllogisticRules ----- */
+    /**
+     * {&amp;lt;S ==&amp;gt; M&amp;gt;, &amp;lt;M ==&amp;gt; P&amp;gt;} |- &amp;lt;S ==&amp;gt; P&amp;gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue deduction(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L190">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L191">        final float f2 = v2.getFrequency();</span>
+<span class="fc" id="L192">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L193">        final double c2 = v2.getConfidence();</span>
+<span class="fc" id="L194">        final float f = (float)and(f1, f2);</span>
+<span class="fc" id="L195">        final double c = and(c1, c2, f);</span>
+<span class="fc" id="L196">        return new TruthValue(f, c, narParameters);</span>
+    }
+
+    /**
+     * {M, &amp;lt;M ==&amp;gt; P&amp;gt;} |- P
+     * @param v1 Truth value of the first premise
+     * @param reliance Confidence of the second (analytical) premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue deduction(final TruthValue v1, final float reliance, Parameters narParameters) {
+<span class="fc" id="L206">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L207">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L208">        final double c = and(f1, c1, reliance);</span>
+<span class="fc" id="L209">        return new TruthValue(f1, c, true, narParameters);</span>
+    }
+
+    /**
+     * {&amp;lt;S ==&amp;gt; M&amp;gt;, &amp;lt;M &amp;lt;=&amp;gt; P&amp;gt;} |- &amp;lt;S ==&amp;gt; P&amp;gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue analogy(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L219">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L220">        final float f2 = v2.getFrequency();</span>
+<span class="fc" id="L221">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L222">        final double c2 = v2.getConfidence();</span>
+<span class="fc" id="L223">        final float f = (float)and(f1, f2);</span>
+<span class="fc" id="L224">        final double c = and(c1, c2, f2);</span>
+<span class="fc" id="L225">        return new TruthValue(f, c, narParameters);</span>
+    }
+
+    /**
+     * {&amp;lt;S &amp;lt;=&amp;gt; M&amp;gt;, &amp;lt;M &amp;lt;=&amp;gt; P&amp;gt;} |- &amp;lt;S &amp;lt;=&amp;gt; P&amp;gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue resemblance(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L235">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L236">        final float f2 = v2.getFrequency();</span>
+<span class="fc" id="L237">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L238">        final double c2 = v2.getConfidence();</span>
+<span class="fc" id="L239">        final float f = (float)and(f1, f2);</span>
+<span class="fc" id="L240">        final double c = and(c1, c2, or(f1, f2));</span>
+<span class="fc" id="L241">        return new TruthValue(f, c, narParameters);</span>
+    }
+
+    /**
+     * {&amp;lt;S ==&amp;gt; M&amp;gt;, &amp;lt;P ==&amp;gt; M&amp;gt;} |- &amp;lt;S ==&amp;gt; P&amp;gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue abduction(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc bfc" id="L251" title="All 4 branches covered.">        if (v1.getAnalytic() || v2.getAnalytic()) {</span>
+<span class="fc" id="L252">            return new TruthValue(0.5f, 0f, narParameters);</span>
+        }
+<span class="fc" id="L254">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L255">        final float f2 = v2.getFrequency();</span>
+<span class="fc" id="L256">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L257">        final double c2 = v2.getConfidence();</span>
+<span class="fc" id="L258">        final double w = and(f2, c1, c2);</span>
+<span class="fc" id="L259">        final double c = w2c(w, narParameters);</span>
+<span class="fc" id="L260">        return new TruthValue(f1, c, narParameters);</span>
+    }
+
+    /**
+     * {M, &amp;lt;P ==&amp;gt; M&amp;gt;} |- P
+     * @param v1 Truth value of the first premise
+     * @param reliance Confidence of the second (analytical) premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue abduction(final TruthValue v1, final float reliance, Parameters narParameters) {
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if (v1.getAnalytic()) {</span>
+<span class="fc" id="L271">            return new TruthValue(0.5f, 0f, narParameters);</span>
+        }
+<span class="fc" id="L273">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L274">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L275">        final double w = and(c1, reliance);</span>
+<span class="fc" id="L276">        final double c = w2c(w, narParameters);</span>
+<span class="fc" id="L277">        return new TruthValue(f1, c, true, narParameters);</span>
+    }
+
+    /**
+     * {&amp;lt;M ==&amp;gt; S&amp;gt;, &amp;lt;M ==&amp;gt; P&amp;gt;} |- &amp;lt;S ==&amp;gt; P&amp;gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue induction(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L287">        return abduction(v2, v1, narParameters);</span>
+    }
+
+    /**
+     * {&amp;lt;M ==&amp;gt; S&amp;gt;, &amp;lt;P ==&amp;gt; M&amp;gt;} |- &amp;lt;S ==&amp;gt; P&amp;gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue exemplification(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc bfc" id="L297" title="All 4 branches covered.">        if (v1.getAnalytic() || v2.getAnalytic()) {</span>
+<span class="fc" id="L298">            return new TruthValue(0.5f, 0f, narParameters);</span>
+        }
+<span class="fc" id="L300">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L301">        final float f2 = v2.getFrequency();</span>
+<span class="fc" id="L302">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L303">        final double c2 = v2.getConfidence();</span>
+<span class="fc" id="L304">        final double w = and(f1, f2, c1, c2);</span>
+<span class="fc" id="L305">        final double c = w2c(w, narParameters);</span>
+<span class="fc" id="L306">        return new TruthValue(1, c, narParameters);</span>
+    }
+
+    /**
+     * {&amp;lt;M ==&amp;gt; S&amp;gt;, &amp;lt;M ==&amp;gt; P&amp;gt;} |- &amp;lt;S &amp;lt;=&amp;gt; P&amp;gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue comparison(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L316">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L317">        final float f2 = v2.getFrequency();</span>
+<span class="fc" id="L318">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L319">        final double c2 = v2.getConfidence();</span>
+<span class="fc" id="L320">        final float f0 = or(f1, f2);</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        final float f = (f0 == 0) ? 0 : ((float)and(f1, f2) / f0);</span>
+<span class="fc" id="L322">        final double w = and(f0, c1, c2);</span>
+<span class="fc" id="L323">        final double c = w2c(w, narParameters);</span>
+<span class="fc" id="L324">        return new TruthValue(f, c, narParameters);</span>
+    }
+
+    /* ----- desire-value functions, called in SyllogisticRules ----- */
+    /**
+     * A function specially designed for desire value [To be refined]
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue desireStrong(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L335">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L336">        final float f2 = v2.getFrequency();</span>
+<span class="fc" id="L337">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L338">        final double c2 = v2.getConfidence();</span>
+<span class="fc" id="L339">        final float f = (float)and(f1, f2);</span>
+<span class="fc" id="L340">        final double c = and(c1, c2, f2);</span>
+<span class="fc" id="L341">        return new TruthValue(f, c, narParameters);</span>
+    }
+
+    /**
+     * A function specially designed for desire value [To be refined]
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue desireWeak(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L351">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L352">        final float f2 = v2.getFrequency();</span>
+<span class="fc" id="L353">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L354">        final double c2 = v2.getConfidence();</span>
+<span class="fc" id="L355">        final float f = (float)and(f1, f2);</span>
+<span class="fc" id="L356">        final double c = and(c1, c2, f2, w2c(1.0, narParameters));</span>
+<span class="fc" id="L357">        return new TruthValue(f, c, narParameters);</span>
+    }
+
+    /**
+     * A function specially designed for desire value [To be refined]
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue desireDed(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L367">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L368">        final float f2 = v2.getFrequency();</span>
+<span class="fc" id="L369">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L370">        final double c2 = v2.getConfidence();</span>
+<span class="fc" id="L371">        final float f = (float)and(f1, f2);</span>
+<span class="fc" id="L372">        final double c = and(c1, c2);</span>
+<span class="fc" id="L373">        return new TruthValue(f, c, narParameters);</span>
+    }
+
+    /**
+     * A function specially designed for desire value [To be refined]
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue desireInd(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L383">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L384">        final float f2 = v2.getFrequency();</span>
+<span class="fc" id="L385">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L386">        final double c2 = v2.getConfidence();</span>
+<span class="fc" id="L387">        final double w = and(f2, c1, c2);</span>
+<span class="fc" id="L388">        final double c = w2c(w, narParameters);</span>
+<span class="fc" id="L389">        return new TruthValue(f1, c, narParameters);</span>
+    }
+
+    /* ----- double argument functions, called in CompositionalRules ----- */
+    /**
+     * {&amp;lt;M --&amp;gt; S&amp;gt;, &amp;lt;M &amp;gt; P&amp;gt;} |- &amp;lt;M --&amp;gt; (S|P)&amp;gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue union(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L400">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L401">        final float f2 = v2.getFrequency();</span>
+<span class="fc" id="L402">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L403">        final double c2 = v2.getConfidence();</span>
+<span class="fc" id="L404">        final float f = or(f1, f2);</span>
+<span class="fc" id="L405">        final double c = and(c1, c2);</span>
+<span class="fc" id="L406">        return new TruthValue(f, c, narParameters);</span>
+    }
+
+    /**
+     * {&amp;lt;M --&amp;gt; S&amp;gt;, &amp;lt;M &amp;lt;-&amp;gt; P&amp;gt;} |- &amp;lt;M --&amp;gt; (S&amp;amp;P)&amp;gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue intersection(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L416">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L417">        final float f2 = v2.getFrequency();</span>
+<span class="fc" id="L418">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L419">        final double c2 = v2.getConfidence();</span>
+<span class="fc" id="L420">        final float f = (float)and(f1, f2);</span>
+<span class="fc" id="L421">        final double c = and(c1, c2);</span>
+<span class="fc" id="L422">        return new TruthValue(f, c, narParameters);</span>
+    }
+
+    /**
+     * {(||, A, B), (--, B)} |- A
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue reduceDisjunction(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L432">        final TruthValue v0 = intersection(v1, negation(v2, narParameters), narParameters);</span>
+<span class="fc" id="L433">        return deduction(v0, 1f, narParameters);</span>
+    }
+
+    /**
+     * {(--, (&amp;amp;&amp;amp;, A, B)), B} |- (--, A)
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue reduceConjunction(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L443">        final TruthValue v0 = intersection(negation(v1, narParameters), v2, narParameters);</span>
+<span class="fc" id="L444">        return negation(deduction(v0, 1f, narParameters), narParameters);</span>
+    }
+
+    /**
+     * {(--, (&amp;amp;&amp;amp;, A, (--, B))), (--, B)} |- (--, A)
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue reduceConjunctionNeg(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L454">        return reduceConjunction(v1, negation(v2, narParameters), narParameters);</span>
+    }
+
+    /**
+     * {(&amp;amp;&amp;amp;, &amp;lt;#x() ==&amp;gt; M&amp;gt;, &amp;lt;#x() ==&amp;gt; P&amp;gt;), S ==&amp;gt; M} |- &amp;lt;S ==&amp;gt; P&amp;gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    public static final TruthValue anonymousAnalogy(final TruthValue v1, final TruthValue v2, Parameters narParameters) {
+<span class="fc" id="L464">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L465">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L466">        final TruthValue v0 = new TruthValue(f1, w2c(c1, narParameters), narParameters);</span>
+<span class="fc" id="L467">        return analogy(v2, v0, narParameters);</span>
+    }
+    
+    
+    /** Indicates the result of eternalization
+     *
+     * Implements the same functionality like TruthValue */
+    public static final class EternalizedTruthValue extends TruthValue {
+        public EternalizedTruthValue(final float f, final double c, Parameters narParameters) {
+<span class="fc" id="L476">            super(f, c, narParameters);</span>
+<span class="fc" id="L477">        }        </span>
+    }
+    
+    /**
+     * From one moment to eternal
+     * @param v1 Truth value of the premise
+     * @return Truth value of the conclusion
+     */
+    public static final EternalizedTruthValue eternalize(final TruthValue v1, Parameters narParameters) {
+<span class="fc" id="L486">        final float f1 = v1.getFrequency();</span>
+<span class="fc" id="L487">        final double c1 = v1.getConfidence();</span>
+<span class="fc" id="L488">        final double c = w2c(c1, narParameters);</span>
+<span class="fc" id="L489">        return new EternalizedTruthValue(f1, c, narParameters);</span>
+    }
+    
+    public static final float temporalProjection(final long sourceTime, final long targetTime, final long currentTime, Parameters param) {
+<span class="fc" id="L493">        final double a = 100000.0 * param.PROJECTION_DECAY; //projection less strict as we changed in v2.0.0  10000.0 slower decay than 100000.0</span>
+<span class="fc" id="L494">        return 1.0f - abs(sourceTime - targetTime) / (float) (abs(sourceTime - currentTime) + abs(targetTime - currentTime) + a);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

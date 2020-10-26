@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EventEmitter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.io.events</a> &gt; <span class="el_source">EventEmitter.java</span></div><h1>EventEmitter.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.io.events;
+
+import java.util.*;
+
+/**
+ *
+ */
+// Adapted from http://www.recursiverobot.com/post/86215392884/witness-a-simple-android-and-java-event-emitter
+// TODO separate this into a single-thread and multithread implementation
+public class EventEmitter {
+
+    private final Map&lt;Class&lt;?&gt;, List&lt;EventObserver&gt;&gt; events;
+            
+    
+<span class="pc" id="L38">    private final Deque&lt;Object[]&gt; pendingOps = new ArrayDeque();</span>
+    
+    /** EventEmitter that allows unknown events; must use concurrent collection
+     *  for multithreading since new event classes may be added at any time.
+     */
+<span class="fc" id="L43">    public EventEmitter() {</span>
+        /*if (Parameters.THREADS &gt; 1)
+            events = new ConcurrentHashMap&lt;&gt;();
+        else*/
+            //events = new LinkedHashMap&lt;&gt;();
+<span class="fc" id="L48">        events = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L49">    }</span>
+
+    /** EventEmitter with a fixed set of known events; the 'events' map
+     *  can then be made unmodifiable and non-concurrent for speed.    */
+<span class="nc" id="L53">    public EventEmitter(final Class... knownEventClasses) {</span>
+<span class="nc" id="L54">        events = new LinkedHashMap(knownEventClasses.length);</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        for (final Class c : knownEventClasses) {</span>
+<span class="nc" id="L56">            events.put(c, newObserverList());</span>
+        }
+<span class="nc" id="L58">    }</span>
+
+    protected List&lt;EventObserver&gt; newObserverList() {
+<span class="fc" id="L61">        return new ArrayList();</span>
+        /*return Parameters.THREADS == 1 ? 
+                new ArrayList() : Collections.synchronizedList(new ArrayList());*/
+    }
+    
+    public final boolean isActive(final Class event) {
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (events.get(event)!=null)</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            return !events.get(event).isEmpty();</span>
+<span class="fc" id="L69">        return false;</span>
+    }
+    
+    //apply pending on/off changes when synchronizing, ex: in-between memory cycles
+    public void synch() {
+<span class="fc" id="L74">        synchronized (pendingOps) {</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            if (!pendingOps.isEmpty()) {</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                for (final Object[] o : pendingOps) {</span>
+<span class="nc" id="L77">                    final Class c = (Class)o[1];</span>
+<span class="nc" id="L78">                    final EventObserver d = (EventObserver)o[2];</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                    if ((Boolean)o[0]) {                        </span>
+<span class="nc" id="L80">                        on(c,d);</span>
+                    }
+                    else {                        
+<span class="nc" id="L83">                        off(c,d);</span>
+                    }
+<span class="nc" id="L85">                }</span>
+            }
+<span class="fc" id="L87">            pendingOps.clear();</span>
+<span class="fc" id="L88">        }</span>
+<span class="fc" id="L89">    }  </span>
+    public void on(final Class&lt;?&gt; event, final EventObserver o) {
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (events.containsKey(event))</span>
+<span class="fc" id="L92">            events.get(event).add(o);</span>
+        else {
+<span class="fc" id="L94">            final List&lt;EventObserver&gt; a = newObserverList();</span>
+<span class="fc" id="L95">            a.add(o);</span>
+<span class="fc" id="L96">            events.put(event, a);</span>
+        }       
+<span class="fc" id="L98">    }</span>
+ 
+    /**
+     * @param event
+     * @param o
+     */
+    public void off(final Class&lt;?&gt; event, final EventObserver o) {
+<span class="nc bnc" id="L105" title="All 4 branches missed.">        if (null == event || null == o)</span>
+<span class="nc" id="L106">            throw new IllegalStateException(&quot;Invalid parameter&quot;);</span>
+ 
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (!events.containsKey(event))</span>
+<span class="nc" id="L109">            throw new IllegalStateException(&quot;Unknown event: &quot; + event);</span>
+
+<span class="nc" id="L111">        events.get(event).remove(o);</span>
+        /*if (!removed) {
+            throw new IllegalStateException(&quot;EventObserver &quot; + o + &quot; was not registered for events&quot;);
+        }*/        
+<span class="nc" id="L115">    }</span>
+
+    /** for enabling many events at the same time */
+    public void set(final EventObserver o, final boolean enable, final Class... events) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        for (final Class c : events) {</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            if (enable)</span>
+<span class="fc" id="L121">                on(c, o);</span>
+            else
+<span class="nc" id="L123">                off(c, o);</span>
+        }
+<span class="fc" id="L125">    }</span>
+    
+
+    public void emit(final Class eventClass, final Object... params) {
+<span class="fc" id="L129">        final List&lt;EventObserver&gt; observers = events.get(eventClass);</span>
+        
+<span class="pc bpc" id="L131" title="1 of 4 branches missed.">        if ((observers == null) || (observers.isEmpty())) return;</span>
+
+<span class="fc" id="L133">        final int n = observers.size();</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (final EventObserver m : observers) {</span>
+<span class="fc" id="L135">            m.event(eventClass, params);</span>
+<span class="fc" id="L136">        }</span>
+        
+<span class="fc" id="L138">    }</span>
+
+
+    /** Observes events emitted by EventEmitter */
+    public interface EventObserver&lt;C&gt; {
+        void event(Class&lt;? extends C&gt; event, Object[] args);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

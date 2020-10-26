@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VisionChannel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.plugin.perception</a> &gt; <span class="el_source">VisionChannel.java</span></div><h1>VisionChannel.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.plugin.perception;
+
+import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.opennars.entity.*;
+import org.opennars.inference.BudgetFunctions;
+import org.opennars.interfaces.Timable;
+import org.opennars.interfaces.pub.Reasoner;
+import org.opennars.io.Narsese;
+import org.opennars.io.Symbols;
+import org.opennars.io.Texts;
+import org.opennars.io.events.EventEmitter;
+import org.opennars.io.events.Events;
+import org.opennars.io.events.Events.CycleEnd;
+import org.opennars.io.events.Events.ResetEnd;
+import org.opennars.language.*;
+import org.opennars.main.Nar;
+import org.opennars.operator.Operator;
+
+public class VisionChannel extends SensoryChannel  {
+<span class="fc" id="L45">    public volatile float defaultOutputConfidence = 0.5f;</span>
+<span class="fc" id="L46">    public int nPrototypes = 0;</span>
+    public ArrayList&lt;Prototype&gt; prototypes;
+    double[][] inputs;
+    boolean[][] updated;
+<span class="fc" id="L50">    int cnt_updated = 0;</span>
+<span class="fc" id="L51">    int px = 0;</span>
+<span class="fc" id="L52">    int py = 0;</span>
+    final Term label;
+    final Nar nar;
+<span class="fc" id="L55">    boolean HadNewInput = false; //only generate frames if at least something was input since last &quot;commit to Nar&quot;</span>
+    public final EventEmitter.EventObserver obs;
+
+    public VisionChannel(final String label, final Reasoner nar, final Reasoner reportResultsTo, final int width, final int height, final int duration,
+            float defaultOutputConfidence, int nPrototypes) {
+<span class="fc" id="L60">        super((Nar)nar,(SensoryChannel)reportResultsTo, width, height, duration, SetInt.make(new Term(label)));</span>
+<span class="fc" id="L61">        this.nar = (Nar)nar;</span>
+<span class="fc" id="L62">        this.label = SetInt.make(new Term(label));</span>
+<span class="fc" id="L63">        this.defaultOutputConfidence = defaultOutputConfidence;</span>
+<span class="fc" id="L64">        this.nPrototypes = nPrototypes;</span>
+<span class="fc" id="L65">        prototypes = new ArrayList&lt;Prototype&gt;();</span>
+<span class="fc" id="L66">        inputs = new double[height][width];</span>
+<span class="fc" id="L67">        updated = new boolean[height][width];</span>
+<span class="fc" id="L68">        obs = (ev, a) -&gt; {</span>
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">            if(HadNewInput &amp;&amp; ev == CycleEnd.class) {</span>
+<span class="fc" id="L70">                empty_cycles++;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">                if(empty_cycles &gt; duration) { //a deadline, pixels can't appear more than duration after each other</span>
+<span class="fc" id="L72">                    step_start(nar); //so we know we can input, not only when all pixels were re-set.</span>
+                }
+            }
+            else
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            if(ev == ResetEnd.class) {</span>
+<span class="fc" id="L77">                resetChannel();</span>
+            }
+<span class="fc" id="L79">        };</span>
+        
+<span class="fc" id="L81">    }</span>
+    
+    @Override
+    public boolean setEnabled(final Nar n, final boolean enabled) {
+<span class="fc" id="L85">        n.memory.event.set(obs, enabled, Events.CycleEnd.class);</span>
+<span class="fc" id="L86">        n.memory.event.set(obs, enabled, Events.ResetEnd.class);</span>
+<span class="fc" id="L87">        return true;</span>
+    }
+    
+    @Override
+    public void resetChannel() {
+<span class="fc" id="L92">        inputs = new double[height][width];</span>
+<span class="fc" id="L93">        updated = new boolean[height][width];</span>
+<span class="fc" id="L94">        cnt_updated = 0;</span>
+<span class="fc" id="L95">        px = 0;</span>
+<span class="fc" id="L96">        py = 0;</span>
+<span class="fc" id="L97">        termid = 0;</span>
+<span class="fc" id="L98">        subj = &quot;&quot;;</span>
+<span class="fc" id="L99">    }</span>
+    
+<span class="fc" id="L101">    String subj = &quot;&quot;; </span>
+<span class="fc" id="L102">    int empty_cycles = 0;</span>
+    public boolean AddToMatrix(final Task t, final Timable time) {
+<span class="fc" id="L104">        final Inheritance inh = (Inheritance) t.getTerm(); //channels receive inheritances</span>
+<span class="fc" id="L105">        final String cur_subj = ((SetExt)inh.getSubject()).term[0].index_variable;</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if(!cur_subj.equals(subj)) { //when subject changes, we start to collect from scratch,</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            if(!subj.isEmpty()) { //but only if subj isn't empty</span>
+<span class="fc" id="L108">                step_start(time); //flush to upper level what we so far had</span>
+            }
+<span class="fc" id="L110">            cnt_updated = 0; //this way multiple matrices can be processed by the same vision channel</span>
+<span class="fc" id="L111">            updated = new boolean[height][width];</span>
+<span class="fc" id="L112">            subj = cur_subj;</span>
+        }
+<span class="fc" id="L114">        HadNewInput = true;</span>
+<span class="fc" id="L115">        empty_cycles = 0;</span>
+<span class="fc" id="L116">        final int x = t.getTerm().term_indices[2];</span>
+<span class="fc" id="L117">        final int y = t.getTerm().term_indices[3];</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if(!updated[y][x]) {</span>
+<span class="fc" id="L119">            inputs[y][x] = t.sentence.getTruth().getFrequency();</span>
+<span class="fc" id="L120">            cnt_updated++;</span>
+<span class="fc" id="L121">            updated[y][x] = true;</span>
+        } else { //a second value, so take average of frequencies
+                 //revision wouldn't be proper as each sensory point can just have 1 vote
+<span class="nc" id="L124">            inputs[y][x] = (inputs[y][x]+t.sentence.getTruth().getFrequency()) / 2.0f;</span>
+        }
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        return cnt_updated == height * width;</span>
+    }
+    
+<span class="fc" id="L129">    boolean isEternal = false; //don't use increasing ID if eternal</span>
+    @Override
+    public Nar addInput(final Task t, final Timable time) {
+<span class="fc" id="L132">        isEternal = t.sentence.isEternal();</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if(AddToMatrix(t, time)) //new data complete</span>
+<span class="nc" id="L134">            step_start(time);</span>
+<span class="fc" id="L135">        return nar;</span>
+    }
+    
+<span class="fc" id="L138">    int termid=0;</span>
+    @Override
+    public void step_start(final Timable time)
+    {
+<span class="fc" id="L142">        cnt_updated = 0;</span>
+<span class="fc" id="L143">        HadNewInput = false;</span>
+<span class="fc" id="L144">        termid++;</span>
+        final Term V;
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if(isEternal) {</span>
+<span class="fc" id="L147">            V = SetExt.make(new Term(subj));</span>
+        } else {
+<span class="nc" id="L149">            V = SetExt.make(new Term(subj+termid));   </span>
+        }
+        //the visual space has to be a copy.
+<span class="fc" id="L152">        final float[][] cpy = new float[height][width];</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        for(int i=0;i&lt;height;i++) {</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            for(int j=0;j&lt;width;j++) {</span>
+<span class="fc" id="L155">                cpy[i][j] = (float) inputs[i][j];</span>
+            }
+        }
+<span class="fc" id="L158">        updated = new boolean[height][width];</span>
+<span class="fc" id="L159">        inputs = new double[height][width];</span>
+<span class="fc" id="L160">        subj = &quot;&quot;;</span>
+<span class="fc" id="L161">        final VisualSpace vspace = new VisualSpace(nar, cpy, py, px, height, width);</span>
+        //attach sensation to term:
+<span class="fc" id="L163">        V.imagination = vspace;</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        Stamp stamp = isEternal ? new Stamp(time, nar.memory, Tense.Eternal) : new Stamp(time, nar.memory);</span>
+        
+<span class="fc" id="L166">        final Sentence s = new Sentence(Inheritance.make(V, this.label),</span>
+                                                   Symbols.JUDGMENT_MARK, 
+                                                   new TruthValue(1.0f,
+                                                   defaultOutputConfidence, nar.narParameters), 
+                                                   stamp);
+
+<span class="fc" id="L172">        final BudgetValue budgetForNewTask = new BudgetValue(nar.narParameters.DEFAULT_JUDGMENT_PRIORITY,</span>
+            nar.narParameters.DEFAULT_JUDGMENT_DURABILITY,
+<span class="fc" id="L174">            BudgetFunctions.truthToQuality(s.truth), nar.narParameters);</span>
+<span class="fc" id="L175">        final Task newTask = new Task(s, budgetForNewTask, Task.EnumType.INPUT);</span>
+<span class="fc" id="L176">        newTask.setElemOfSequenceBuffer(true);</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if(this.nPrototypes == 0) { //report directly to NARS as there are no prototypes</span>
+<span class="fc" id="L178">            this.results.add(newTask);//feeds results into &quot;upper&quot; sensory channels:</span>
+<span class="fc" id="L179">            this.step_finished(time);</span>
+        } else {
+            //if there is no other prototype yet we return
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            if(this.prototypes.isEmpty()) {</span>
+<span class="nc" id="L183">                this.prototypes.add(new Prototype(newTask));</span>
+<span class="nc" id="L184">                this.results.add(newTask);//feeds results into &quot;upper&quot; sensory channels:</span>
+<span class="nc" id="L185">                this.step_finished(time);</span>
+            } else {
+                //1. determine the most similar prototype
+<span class="nc" id="L188">                float similarity = 0;</span>
+<span class="nc" id="L189">                TruthValue bestTruth = null;</span>
+<span class="nc" id="L190">                Prototype best = null;</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                for(Prototype p : prototypes) {</span>
+<span class="nc" id="L192">                    Inheritance inh = (Inheritance) p.task.getTerm();</span>
+<span class="nc" id="L193">                    TruthValue simCur = inh.getSubject().imagination.AbductionOrComparisonTo(vspace, true);</span>
+<span class="nc" id="L194">                    float simCurExp = simCur.getExpectation();</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                    if(simCurExp &gt; similarity) {</span>
+<span class="nc" id="L196">                        best = p;</span>
+<span class="nc" id="L197">                        similarity = simCurExp;</span>
+<span class="nc" id="L198">                        bestTruth = simCur;</span>
+                    }
+<span class="nc" id="L200">                }</span>
+                //2. replace the rarest seen prototype with the new prototype when full
+                // else just add it
+<span class="nc bnc" id="L203" title="All 2 branches missed.">                if(prototypes.size() &gt;= this.nPrototypes) {</span>
+<span class="nc" id="L204">                    int lowestValue = Integer.MAX_VALUE;</span>
+<span class="nc" id="L205">                    int lowestIndex = -1;</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">                    for(int i=0;i&lt;prototypes.size();i++) {</span>
+<span class="nc" id="L207">                        Prototype cur = prototypes.get(i);</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                        if(cur.getObservationCount() &lt; lowestValue) {</span>
+<span class="nc" id="L209">                            lowestValue = i;</span>
+<span class="nc" id="L210">                            lowestIndex = i;</span>
+                        }
+                    }
+<span class="nc bnc" id="L213" title="All 2 branches missed.">                    if(similarity &lt; 0.8f) {</span>
+<span class="nc" id="L214">                        prototypes.set(lowestIndex, new Prototype(newTask));</span>
+                    }
+<span class="nc" id="L216">                } else {</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                    if(similarity &lt; 0.8f) {</span>
+<span class="nc" id="L218">                        prototypes.add(new Prototype(newTask));</span>
+                    }
+                }
+
+                //3. build spatial relation to previous
+<span class="nc bnc" id="L223" title="All 2 branches missed.">                if(lastPrototype != null) {</span>
+                    //int oldFocusX = this.focusX;
+                    //int oldFocusY = this.focusY;
+<span class="nc" id="L226">                    VisualSpace lastSpace = (VisualSpace) ((Inheritance) lastPrototype.task.getTerm()).getSubject().imagination;</span>
+<span class="nc" id="L227">                    VisualSpace newSpace = (VisualSpace) ((Inheritance) best.task.getTerm()).getSubject().imagination;</span>
+<span class="nc" id="L228">                    int oldFocusX = lastSpace.px;</span>
+<span class="nc" id="L229">                    int oldFocusY = lastSpace.py;</span>
+<span class="nc" id="L230">                    int newFocusX = newSpace.px;</span>
+<span class="nc" id="L231">                    int newFocusY = newSpace.py;</span>
+<span class="nc" id="L232">                    float dx = 0, dy = 0;</span>
+<span class="nc" id="L233">                    String minusX = &quot;&quot;;</span>
+<span class="nc" id="L234">                    String minusY = &quot;&quot;;</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                    if(newFocusX &gt;= oldFocusX) {</span>
+<span class="nc" id="L236">                        dx = newFocusX - oldFocusX;</span>
+                    } else {
+<span class="nc" id="L238">                        minusX = &quot;-&quot;;</span>
+<span class="nc" id="L239">                        dx = oldFocusX - newFocusX;</span>
+                    }
+<span class="nc bnc" id="L241" title="All 2 branches missed.">                    if(newFocusY &gt;= oldFocusY) {</span>
+<span class="nc" id="L242">                        dy = newFocusY - oldFocusY;</span>
+                    } else {
+<span class="nc" id="L244">                        minusY = &quot;-&quot;;</span>
+<span class="nc" id="L245">                        dy = oldFocusY - newFocusY;</span>
+                    }
+<span class="nc" id="L247">                    float xParam = dx / (float) this.width;</span>
+<span class="nc" id="L248">                    float yParam = dy / (float) this.height;</span>
+                    try {
+                        //timing to make sure procedure learning observes the operation after the last prototype
+<span class="nc" id="L251">                        this.nar.cycles(this.nar.narParameters.DURATION);</span>
+<span class="nc" id="L252">                        Task taskX = new Narsese(this.nar).parseTask(&quot;(^move,{SELF},&quot;+minusX+Texts.n1(xParam)+&quot;,&quot;+minusY+Texts.n1(yParam)+&quot;). :|:&quot;);</span>
+<span class="nc" id="L253">                        taskX.setElemOfSequenceBuffer(true);</span>
+<span class="nc" id="L254">                        this.results.add(taskX);               </span>
+<span class="nc" id="L255">                        this.step_finished(time);</span>
+                        //timing to make sure procedure learning observes the operation before the new prototype
+<span class="nc" id="L257">                        this.nar.cycles(this.nar.narParameters.DURATION);</span>
+                        //stamp has to be re-built according to new timing
+<span class="nc bnc" id="L259" title="All 2 branches missed.">                        if(!isEternal) {</span>
+<span class="nc" id="L260">                            stamp = new Stamp(time, nar.memory);</span>
+                        }
+<span class="nc" id="L262">                    } catch (Narsese.InvalidInputException ex) {</span>
+<span class="nc" id="L263">                        Logger.getLogger(VisionChannel.class.getName()).log(Level.SEVERE, null, ex);</span>
+<span class="nc" id="L264">                    }</span>
+                }
+                
+                //4. add the best prototype as identified sensation
+                //but with current time stamp
+<span class="nc" id="L269">                Sentence bestSentence = new Sentence(best.task.getTerm(),</span>
+                                                     best.task.sentence.punctuation,
+                                                     bestTruth,
+<span class="nc" id="L272">                                                     stamp.clone());</span>
+<span class="nc" id="L273">                final Task bestTask = new Task(bestSentence, best.task.budget.clone(), Task.EnumType.INPUT);</span>
+<span class="nc" id="L274">                bestTask.setElemOfSequenceBuffer(true);</span>
+<span class="nc" id="L275">                this.results.add(bestTask);//feeds results into &quot;upper&quot; sensory channels:</span>
+<span class="nc" id="L276">                this.step_finished(time);</span>
+                //5. reward the best prototype and set as the last observed one
+<span class="nc" id="L278">                best.incrementObservationCount();</span>
+<span class="nc" id="L279">                lastPrototype = best;</span>
+            }
+        }
+<span class="fc" id="L282">    }</span>
+    
+<span class="fc" id="L284">    Prototype lastPrototype = null;</span>
+    
+    public void setFocus(int px, int py) {
+<span class="nc" id="L287">        this.px = px;</span>
+<span class="nc" id="L288">        this.py = py;</span>
+<span class="nc" id="L289">    }</span>
+    
+    class Prototype {
+        int observationCount;
+        Task task;
+<span class="nc" id="L294">        public Prototype(Task t) {</span>
+<span class="nc" id="L295">            this.observationCount = 1; //as the task itself is a case</span>
+<span class="nc" id="L296">            this.task = t;</span>
+<span class="nc" id="L297">        }</span>
+        public void incrementObservationCount() {
+<span class="nc" id="L299">            this.observationCount++;</span>
+<span class="nc" id="L300">        }</span>
+        public int getObservationCount() {
+<span class="nc" id="L302">            return this.observationCount;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

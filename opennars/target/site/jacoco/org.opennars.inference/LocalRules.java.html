@@ -1,0 +1,479 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocalRules.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.inference</a> &gt; <span class="el_source">LocalRules.java</span></div><h1>LocalRules.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.inference;
+
+import org.opennars.control.DerivationContext;
+import org.opennars.entity.*;
+import org.opennars.interfaces.Timable;
+import org.opennars.io.Symbols;
+import org.opennars.io.events.Events;
+import org.opennars.io.events.Events.Answer;
+import org.opennars.io.events.Events.Unsolved;
+import org.opennars.io.events.OutputHandler;
+import org.opennars.language.*;
+import org.opennars.storage.Memory;
+import java.util.List;
+import static org.opennars.inference.TemporalRules.matchingOrder;
+import static org.opennars.inference.TemporalRules.reverseOrder;
+import static org.opennars.inference.TruthFunctions.temporalProjection;
+import static org.opennars.language.CompoundTerm.extractIntervals;
+import org.opennars.main.Parameters;
+
+/**
+ * Directly process a task by a oldBelief, with only two Terms in both. In
+ * matching, the new task is compared with an existing direct Task in that
+ * Concept, to carry out:
+ * &lt;p&gt;
+ *   revision: between judgments or goals on non-overlapping evidence;&lt;br&gt;
+ *   satisfy: between a Sentence and a Question/Goal; &lt;br&gt;
+ *   merge: between items of the same type and stamp; &lt;br&gt;
+ *   conversion: between different inheritance relations.&lt;br&gt;
+ *
+ * @author Pei Wang
+ * @author Patrick Hammer
+ */
+<span class="nc" id="L56">public class LocalRules {</span>
+
+    /* -------------------- same contents -------------------- */
+    /**
+     * The task and belief have the same content
+     *
+     * @param task The task
+     * @param belief The belief
+     */
+    // called in RuleTables.reason
+    public static boolean match(final Task task, final Sentence belief, Concept beliefConcept, final DerivationContext nal) {
+<span class="fc" id="L67">        final Sentence sentence = task.sentence;</span>
+        
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (sentence.isJudgment()) {</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            if (revisible(sentence, belief, nal.narParameters)) {</span>
+<span class="fc" id="L71">                return revision(sentence, belief, beliefConcept, true, nal);</span>
+            }
+        } else {
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            if (matchingOrder(sentence, belief)) {</span>
+<span class="fc" id="L75">                final Term[] u = new Term[] { sentence.term, belief.term };</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                if (Variables.unify(nal.memory.randomNumber, Symbols.VAR_QUERY, u)) {</span>
+<span class="fc" id="L77">                    trySolution(belief, task, nal, true);</span>
+                }
+            }
+        }
+<span class="fc" id="L81">        return false;</span>
+    }
+
+    /**
+     * Check whether two sentences can be used in revision
+     *
+     * @param s1 The first sentence
+     * @param s2 The second sentence
+     * @return If revision is possible between the two sentences
+     */
+    public static boolean revisible(final Sentence s1, final Sentence s2, Parameters narParameters) {
+<span class="fc bfc" id="L92" title="All 6 branches covered.">        if(!s1.isEternal() &amp;&amp; !s2.isEternal() &amp;&amp; Math.abs(s1.getOccurenceTime() - s2.getOccurenceTime()) &gt; narParameters.REVISION_MAX_OCCURRENCE_DISTANCE) {</span>
+<span class="fc" id="L93">            return false;</span>
+        }
+<span class="pc bpc" id="L95" title="3 of 4 branches missed.">        if(s1.term.term_indices != null &amp;&amp; s2.term.term_indices != null) {</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            for(int i=0;i&lt;s1.term.term_indices.length;i++) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                if(s1.term.term_indices[i] != s2.term.term_indices[i]) {</span>
+<span class="nc" id="L98">                    return false;</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        return (s1.getRevisible() &amp;&amp; </span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                matchingOrder(s1.getTemporalOrder(), s2.getTemporalOrder()) &amp;&amp;</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                CompoundTerm.replaceIntervals(s1.term).equals(CompoundTerm.replaceIntervals(s2.term)) &amp;&amp;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                !Stamp.baseOverlap(s1.stamp, s2.stamp));</span>
+    }
+
+    /**
+     * Belief revision
+     *
+     * Summarizes the evidence of two beliefs with same content.
+     * called from processGoal and processJudgment and LocalRules.match
+     * 
+     * @param newBelief The new belief in task
+     * @param oldBelief The previous belief with the same content
+     * @param feedbackToLinks Whether to send feedback to the links
+     */
+    public static boolean revision(final Sentence newBelief, final Sentence oldBelief, final Concept beliefConcept, final boolean feedbackToLinks, final DerivationContext nal) {
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (newBelief.term==null) { </span>
+<span class="nc" id="L120">            return false;</span>
+        }
+        
+<span class="fc" id="L123">        newBelief.stamp.alreadyAnticipatedNegConfirmation = oldBelief.stamp.alreadyAnticipatedNegConfirmation;</span>
+<span class="fc" id="L124">        final TruthValue newTruth = newBelief.truth.clone();</span>
+<span class="fc" id="L125">        final TruthValue oldTruth = oldBelief.truth;</span>
+<span class="fc" id="L126">        boolean useNewBeliefTerm = intervalProjection(nal, newBelief.getTerm(), oldBelief.getTerm(), beliefConcept.recent_intervals, newTruth);</span>
+        
+<span class="fc" id="L128">        final TruthValue truth = TruthFunctions.revision(newTruth, oldTruth, nal.narParameters);</span>
+<span class="fc" id="L129">        final BudgetValue budget = BudgetFunctions.revise(newTruth, oldTruth, truth, feedbackToLinks, nal);</span>
+        
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (budget.aboveThreshold()) {</span>
+<span class="fc" id="L132">            long counter = -1; // -1 is invalid</span>
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">            if (newBelief.term instanceof Implication &amp;&amp; oldBelief.term instanceof Implication) {</span>
+<span class="fc" id="L134">                counter = ((Implication)newBelief.term).counter + ((Implication)oldBelief.term).counter; // add because the evidence adds up</span>
+            }
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            return nal.doublePremiseTaskRevised(useNewBeliefTerm ? newBelief.term : oldBelief.term, truth, budget, counter);</span>
+        }
+        
+<span class="fc" id="L139">        return false;</span>
+    }
+
+    /**
+     * Interval projection
+     * 
+     * Decides to use whether to use old or new term dependent on which one is more usual,
+     * also discounting the truth confidence according to the interval difference.
+     * called by Revision
+     * 
+     * @param nal
+     * @param newBeliefTerm
+     * @param oldBeliefTerm
+     * @param recent_ivals recent intervals
+     * @param newTruth
+     * @return 
+     */
+    public static boolean intervalProjection(final DerivationContext nal, final Term newBeliefTerm, final Term oldBeliefTerm, final List&lt;Float&gt; recent_ivals, final TruthValue newTruth) {
+<span class="fc" id="L157">        boolean useNewBeliefTerm = false;</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if(newBeliefTerm.hasInterval()) {    </span>
+<span class="fc" id="L159">            final List&lt;Long&gt; ivalOld = extractIntervals(nal.memory, oldBeliefTerm);</span>
+<span class="fc" id="L160">            final List&lt;Long&gt; ivalNew = extractIntervals(nal.memory, newBeliefTerm);</span>
+<span class="fc" id="L161">            long AbsDiffSumNew = 0;</span>
+<span class="fc" id="L162">            long AbsDiffSumOld = 0;</span>
+<span class="fc" id="L163">            synchronized(recent_ivals){</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">                if(recent_ivals.isEmpty()) {</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">                    for(final Long l : ivalOld) {</span>
+<span class="fc" id="L166">                        recent_ivals.add((float) l);</span>
+<span class="fc" id="L167">                    }</span>
+                }
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                for(int i=0;i&lt;ivalNew.size();i++) {</span>
+<span class="fc" id="L170">                    final float Inbetween = (recent_ivals.get(i)+ivalNew.get(i)) / 2.0f; //vote as one new entry, turtle style</span>
+<span class="fc" id="L171">                    final float speed = 1.0f / (nal.narParameters.INTERVAL_ADAPT_SPEED*(1.0f-newTruth.getExpectation())); //less truth expectation, slower</span>
+<span class="fc" id="L172">                    recent_ivals.set(i,recent_ivals.get(i)+speed*(Inbetween - recent_ivals.get(i)));</span>
+                }
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                for(int i=0;i&lt;ivalNew.size();i++) {</span>
+<span class="fc" id="L175">                    AbsDiffSumNew += Math.abs(ivalNew.get(i) - recent_ivals.get(i));</span>
+                }      
+<span class="fc bfc" id="L177" title="All 2 branches covered.">                for(int i=0;i&lt;ivalNew.size();i++) {</span>
+<span class="fc" id="L178">                    AbsDiffSumOld += Math.abs(ivalOld.get(i) - recent_ivals.get(i));</span>
+                }
+<span class="fc" id="L180">            }</span>
+<span class="fc" id="L181">            long AbsDiffSum = 0;</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            for(int i=0;i&lt;ivalNew.size();i++) {</span>
+<span class="fc" id="L183">                AbsDiffSum += Math.abs(ivalNew.get(i) - ivalOld.get(i));</span>
+            }
+<span class="fc" id="L185">            final float a = temporalProjection(0, AbsDiffSum, 0, nal.memory.narParameters); //re-project, and it's safe:</span>
+            //we won't count more confidence than
+            //when the second premise would have been shifted
+            //to the necessary time in the first place
+            //to build the hypothesis newBelief encodes
+<span class="fc" id="L190">            newTruth.setConfidence(newTruth.getConfidence()*a);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            useNewBeliefTerm = AbsDiffSumNew &lt; AbsDiffSumOld;</span>
+        }
+<span class="fc" id="L193">        return useNewBeliefTerm;</span>
+}
+
+
+    /**
+     * Check if a Sentence provide a better answer to a Question or Goal
+     *
+     * @param belief The proposed answer
+     * @param task The task to be processed
+     */
+    public static boolean trySolution(final Sentence belief, final Task task, final DerivationContext nal, final boolean report) {
+<span class="fc" id="L204">        final Sentence problem = task.sentence;</span>
+<span class="fc" id="L205">        final Memory memory = nal.mem();</span>
+<span class="fc" id="L206">        final Sentence oldBest = task.getBestSolution();</span>
+        
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (oldBest != null) {</span>
+<span class="fc" id="L209">            final boolean rateByConfidence = oldBest.getTerm().equals(belief.getTerm());</span>
+<span class="fc" id="L210">            final float newQ = solutionQuality(rateByConfidence, task, belief, memory, nal.time);</span>
+<span class="fc" id="L211">            final float oldQ = solutionQuality(rateByConfidence, task, oldBest, memory, nal.time);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            final boolean isBetterSolution = newQ &gt; oldQ;</span>
+<span class="fc" id="L213">            memory.emit(Events.TrySolution.class, isBetterSolution, task, belief);</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (!isBetterSolution) {</span>
+<span class="pc bpc" id="L215" title="1 of 4 branches missed.">                if (problem.isGoal() &amp;&amp; memory.emotion != null) {</span>
+<span class="fc" id="L216">                    memory.emotion.adjustSatisfaction(oldQ, task.getPriority(), nal);</span>
+                }
+<span class="fc" id="L218">                memory.emit(Unsolved.class, task, belief, &quot;Lower quality&quot;);               </span>
+<span class="fc" id="L219">                return false;</span>
+            }
+        }
+<span class="fc" id="L222">        task.setBestSolution(memory, belief, nal.time);</span>
+        //memory.logic.SOLUTION_BEST.commit(task.getPriority());
+        
+<span class="fc" id="L225">        final BudgetValue budget = solutionEval(task, belief, task, nal);</span>
+<span class="fc bfc" id="L226" title="All 4 branches covered.">        if ((budget != null) &amp;&amp; budget.aboveThreshold()) {                       </span>
+            
+            //Solution Activated
+<span class="fc bfc" id="L229" title="All 4 branches covered.">            if(task.sentence.punctuation==Symbols.QUESTION_MARK || task.sentence.punctuation==Symbols.QUEST_MARK) {</span>
+<span class="fc bfc" id="L230" title="All 4 branches covered.">                if(task.isInput() &amp;&amp; report) { //only show input tasks as solutions</span>
+<span class="fc" id="L231">                    memory.emit(Answer.class, task, belief); </span>
+                } else {
+<span class="fc" id="L233">                    memory.emit(OutputHandler.class, task, belief);   //solution to quests and questions can be always showed   </span>
+                }
+            } else {
+<span class="fc" id="L236">                memory.emit(OutputHandler.class, task, belief);   //goal things only show silence related </span>
+            }
+
+<span class="fc" id="L239">            nal.addTask(nal.getCurrentTask(), budget, belief, task.getParentBelief());</span>
+<span class="fc" id="L240">            return true;</span>
+        }
+        else {
+<span class="fc" id="L243">            memory.emit(Unsolved.class, task, belief, &quot;Insufficient budget&quot;);</span>
+        }
+<span class="fc" id="L245">        return false;</span>
+    }
+    
+    /**
+     * Evaluate the quality of the judgment as a solution to a problem
+     *
+     * @param probT A goal or question
+     * @param solution The solution to be evaluated
+     * @return The quality of the judgment as the solution
+     */
+    public static float solutionQuality(final boolean rateByConfidence, final Task probT, final Sentence solution, final Memory memory, final Timable time) {
+<span class="fc" id="L256">        final Sentence problem = probT.sentence;</span>
+        
+<span class="pc bpc" id="L258" title="1 of 6 branches missed.">        if ((probT.sentence.punctuation != solution.punctuation &amp;&amp; solution.term.hasVarQuery()) || !matchingOrder(problem.getTemporalOrder(), solution.getTemporalOrder())) {</span>
+<span class="fc" id="L259">            return 0.0F;</span>
+        }
+        
+<span class="fc" id="L262">        TruthValue truth = solution.truth;</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        if (problem.getOccurenceTime()!=solution.getOccurenceTime()) {</span>
+<span class="fc" id="L264">            truth = solution.projectionTruth(problem.getOccurenceTime(), time.time(), memory);</span>
+        }
+        
+        //when the solutions are comparable, we have to use confidence!! else truth expectation.
+        //this way negative evidence can update the solution instead of getting ignored due to lower truth expectation.
+        //so the previous handling to let whether the problem has query vars decide was wrong.
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if (!rateByConfidence) {</span>
+            /*
+             * just some function that decreases quality of solution if it is complex, and increases if it has a high truth expecation
+             */
+            
+<span class="fc" id="L275">            return (float) (truth.getExpectation() / Math.sqrt(Math.sqrt(Math.sqrt(solution.term.getComplexity()*memory.narParameters.COMPLEXITY_UNIT))));</span>
+        } else {
+<span class="fc" id="L277">            return (float)truth.getConfidence();</span>
+        }
+    }
+
+
+    /* ----- Functions used both in direct and indirect processing of tasks ----- */
+    /**
+     * Evaluate the quality of a belief as a solution to a problem, then reward
+     * the belief and de-prioritize the problem
+     *
+     * @param problem The problem (question or goal) to be solved
+     * @param solution The belief as solution
+     * @param task The task to be immediately processed, or null for continued process
+     * @return The budget for the new task which is the belief activated, if necessary
+     */
+    public static BudgetValue solutionEval(final Task problem, final Sentence solution, Task task, final org.opennars.control.DerivationContext nal) {
+<span class="pc bpc" id="L293" title="1 of 4 branches missed.">        if(problem.sentence.punctuation != solution.punctuation &amp;&amp; solution.term.hasVarQuery()) {</span>
+<span class="fc" id="L294">            return null;</span>
+        }
+<span class="fc" id="L296">        BudgetValue budget = null;</span>
+<span class="fc" id="L297">        boolean feedbackToLinks = false;</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        if (task == null) {</span>
+<span class="nc" id="L299">            task = nal.getCurrentTask();</span>
+<span class="nc" id="L300">            feedbackToLinks = true;</span>
+        }
+<span class="fc" id="L302">        final boolean judgmentTask = task.sentence.isJudgment();</span>
+<span class="fc" id="L303">        final boolean rateByConfidence = problem.getTerm().hasVarQuery(); //here its whether its a what or where question for budget adjustment</span>
+<span class="fc" id="L304">        final float quality = solutionQuality(rateByConfidence, problem, solution, nal.mem(), nal.time);</span>
+        
+<span class="pc bpc" id="L306" title="1 of 4 branches missed.">        if (problem.sentence.isGoal() &amp;&amp; nal.memory.emotion != null) {</span>
+<span class="fc" id="L307">            nal.memory.emotion.adjustSatisfaction(quality, task.getPriority(), nal);</span>
+        }
+        
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (judgmentTask) {</span>
+<span class="nc" id="L311">            task.incPriority(quality);</span>
+        } else {
+<span class="fc" id="L313">            final float taskPriority = task.getPriority(); //+goal satisfication is a matter of degree - https://groups.google.com/forum/#!topic/open-nars/ZfCM416Dx1M</span>
+<span class="fc" id="L314">            budget = new BudgetValue(UtilityFunctions.or(taskPriority, quality), task.getDurability(), BudgetFunctions.truthToQuality(solution.truth), nal.narParameters);</span>
+<span class="fc" id="L315">            task.setPriority(Math.min(1 - quality, taskPriority));</span>
+        }
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">        if (feedbackToLinks) {</span>
+<span class="nc" id="L318">            final TaskLink tLink = nal.getCurrentTaskLink();</span>
+<span class="nc" id="L319">            tLink.setPriority(Math.min(1 - quality, tLink.getPriority()));</span>
+<span class="nc" id="L320">            final TermLink bLink = nal.getCurrentBeliefLink();</span>
+<span class="nc" id="L321">            bLink.incPriority(quality);</span>
+        }
+<span class="fc" id="L323">        return budget;</span>
+    }
+
+
+    /* -------------------- same terms, difference relations -------------------- */
+    /**
+     * The task and belief match reversely
+     *
+     * @param nal Reference to the memory
+     */
+    public static void matchReverse(final DerivationContext nal) {
+<span class="fc" id="L334">        final Task task = nal.getCurrentTask();</span>
+<span class="fc" id="L335">        final Sentence belief = nal.getCurrentBelief();</span>
+<span class="fc" id="L336">        final Sentence sentence = task.sentence;</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (matchingOrder(sentence.getTemporalOrder(), reverseOrder(belief.getTemporalOrder()))) {</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">            if (sentence.isJudgment()) {</span>
+<span class="fc" id="L339">                inferToSym(sentence, belief, nal);</span>
+            } else {
+<span class="fc" id="L341">                conversion(nal);</span>
+            }
+        }
+<span class="fc" id="L344">    }</span>
+
+    /**
+     * Inheritance/Implication matches Similarity/Equivalence
+     *
+     * @param asym A Inheritance/Implication sentence
+     * @param sym A Similarity/Equivalence sentence
+     * @param figure location of the shared term
+     * @param nal Reference to the memory
+     */
+    public static void matchAsymSym(final Sentence asym, final Sentence sym, final int figure, final DerivationContext nal) {
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        if (nal.getCurrentTask().sentence.isJudgment()) {</span>
+<span class="fc" id="L356">            inferToAsym(asym, sym, nal);</span>
+        } else {
+<span class="fc" id="L358">            convertRelation(nal);</span>
+        }
+<span class="fc" id="L360">    }</span>
+
+    /* -------------------- two-premise inference rules -------------------- */
+    /**
+     * Produce Similarity/Equivalence from a pair of reversed Inheritance/Implication
+     * &lt;br&gt;
+     * {&amp;lt;S --&amp;gt; P&amp;gt;, &amp;lt;P --&amp;gt; S} |- &amp;lt;S &amp;lt;-&amp;gt; p&amp;gt;
+     *
+     * @param judgment1 The first premise
+     * @param judgment2 The second premise
+     * @param nal Reference to the memory
+     */
+    private static void inferToSym(final Sentence judgment1, final Sentence judgment2, final DerivationContext nal) {
+<span class="fc" id="L373">        final Statement s1 = (Statement) judgment1.term;</span>
+<span class="fc" id="L374">        final Term t1 = s1.getSubject();</span>
+<span class="fc" id="L375">        final Term t2 = s1.getPredicate();</span>
+        final Term content;
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        if (s1 instanceof Inheritance) {</span>
+<span class="fc" id="L378">            content = Similarity.make(t1, t2);</span>
+        } else {
+<span class="fc" id="L380">            content = Equivalence.make(t1, t2, s1.getTemporalOrder());</span>
+        }
+<span class="fc" id="L382">        final TruthValue value1 = judgment1.truth;</span>
+<span class="fc" id="L383">        final TruthValue value2 = judgment2.truth;</span>
+<span class="fc" id="L384">        final TruthValue truth = TruthFunctions.intersection(value1, value2, nal.narParameters);</span>
+<span class="fc" id="L385">        final BudgetValue budget = BudgetFunctions.forward(truth, nal);</span>
+<span class="fc" id="L386">        nal.doublePremiseTask(content, truth, budget,false, false); //(allow overlap) but not needed here, isn't detachment</span>
+<span class="fc" id="L387">    }</span>
+
+    /**
+     * Produce an Inheritance/Implication from a Similarity/Equivalence and a reversed Inheritance/Implication
+     * &lt;br&gt;
+     * {&amp;lt;S &amp;lt;-&amp;gt; P&amp;gt;, &amp;lt;P --&amp;gt; S&amp;gt;} |- &amp;lt;S --&amp;gt; P&amp;gt;
+     *
+     * @param asym The asymmetric premise
+     * @param sym The symmetric premise
+     * @param nal Reference to the memory
+     */
+    private static void inferToAsym(final Sentence asym, final Sentence sym, final DerivationContext nal) {
+<span class="fc" id="L399">        final Statement statement = (Statement) asym.term;</span>
+<span class="fc" id="L400">        final Term sub = statement.getPredicate();</span>
+<span class="fc" id="L401">        final Term pre = statement.getSubject();</span>
+        
+<span class="fc" id="L403">        final Statement content = Statement.make(statement, sub, pre, statement.getTemporalOrder());</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">        if (content == null) return;</span>
+        
+<span class="fc" id="L406">        final TruthValue truth = TruthFunctions.reduceConjunction(sym.truth, asym.truth, nal.narParameters);</span>
+<span class="fc" id="L407">        final BudgetValue budget = BudgetFunctions.forward(truth, nal);</span>
+<span class="fc" id="L408">        nal.doublePremiseTask(content, truth, budget,false, false);</span>
+<span class="fc" id="L409">    }</span>
+
+    /* -------------------- one-premise inference rules -------------------- */
+    /**
+     * Produce an Inheritance/Implication from a reversed Inheritance/Implication
+     * &lt;br&gt;
+     * {&amp;lt;P --&amp;gt; S&amp;gt;} |- &amp;lt;S --&amp;gt; P&amp;gt;
+     *
+     * @param nal Reference to the memory
+     */
+    private static void conversion(final DerivationContext nal) {
+<span class="fc" id="L420">        final TruthValue truth = TruthFunctions.conversion(nal.getCurrentBelief().truth, nal.narParameters);</span>
+<span class="fc" id="L421">        final BudgetValue budget = BudgetFunctions.forward(truth, nal);</span>
+<span class="fc" id="L422">        convertedJudgment(truth, budget, nal);</span>
+<span class="fc" id="L423">    }</span>
+
+    /**
+     * Switch between Inheritance/Implication and Similarity/Equivalence
+     * &lt;br&gt;
+     * {&amp;lt;S --&amp;gt; P&amp;gt;} |- &amp;lt;S &amp;lt;-&amp;gt; P&amp;gt; {&amp;lt;S &amp;lt;-&amp;gt; P&amp;gt;} |- &amp;lt;S --&amp;gt; P&amp;gt;
+     *
+     * @param nal Reference to the memory
+     */
+    private static void convertRelation(final DerivationContext nal) {
+<span class="fc" id="L433">        TruthValue truth = nal.getCurrentBelief().truth;</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        if (((CompoundTerm) nal.getCurrentTask().getTerm()).isCommutative()) {</span>
+<span class="fc" id="L435">            truth = TruthFunctions.abduction(truth, 1.0f, nal.narParameters);</span>
+        } else {
+<span class="fc" id="L437">            truth = TruthFunctions.deduction(truth, 1.0f, nal.narParameters);</span>
+        }
+<span class="fc" id="L439">        final BudgetValue budget = BudgetFunctions.forward(truth, nal);</span>
+<span class="fc" id="L440">        convertedJudgment(truth, budget, nal);</span>
+<span class="fc" id="L441">    }</span>
+
+    /**
+     * Convert judgment into different relation
+     * &lt;p&gt;
+     * called in MatchingRules
+     *
+     * @param newBudget The budget value of the new task
+     * @param newTruth The truth value of the new task
+     * @param nal Reference to the memory
+     */
+    private static void convertedJudgment(final TruthValue newTruth, final BudgetValue newBudget, final DerivationContext nal) {
+<span class="fc" id="L453">        Statement content = (Statement) nal.getCurrentTask().getTerm();</span>
+<span class="fc" id="L454">        final Statement beliefContent = (Statement) nal.getCurrentBelief().term;</span>
+<span class="fc" id="L455">        final int order = TemporalRules.reverseOrder(beliefContent.getTemporalOrder());</span>
+<span class="fc" id="L456">        final Term subjT = content.getSubject();</span>
+<span class="fc" id="L457">        final Term predT = content.getPredicate();</span>
+<span class="fc" id="L458">        final Term subjB = beliefContent.getSubject();</span>
+<span class="fc" id="L459">        final Term predB = beliefContent.getPredicate();</span>
+        Term otherTerm;
+<span class="fc bfc" id="L461" title="All 2 branches covered.">        if (subjT.hasVarQuery()) {</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">            otherTerm = (predT.equals(subjB)) ? predB : subjB;</span>
+<span class="fc" id="L463">            content = Statement.make(content, otherTerm, predT, order);</span>
+        }
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        if (predT.hasVarQuery()) {</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">            otherTerm = (subjT.equals(subjB)) ? predB : subjB;</span>
+<span class="fc" id="L467">            content = Statement.make(content, subjT, otherTerm, order);</span>
+        }
+        
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">        if (content == null) { </span>
+<span class="nc" id="L471">            return;</span>
+        }
+        
+<span class="fc" id="L474">        nal.singlePremiseTask(content, Symbols.JUDGMENT_MARK, newTruth, newBudget);</span>
+<span class="fc" id="L475">    }</span>
+
+    
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

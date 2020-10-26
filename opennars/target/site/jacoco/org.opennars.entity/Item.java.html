@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Item.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS</a> &gt; <a href="index.source.html" class="el_package">org.opennars.entity</a> &gt; <span class="el_source">Item.java</span></div><h1>Item.java</h1><pre class="source lang-java linenums">/* 
+ * The MIT License
+ *
+ * Copyright 2018 The OpenNARS authors.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the &quot;Software&quot;), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package org.opennars.entity;
+
+import java.io.Serializable;
+import java.util.Comparator;
+
+/**
+ * An item is an object that can be put into a Bag,
+ * to participate in the resource competition of the system.
+ * &lt;p&gt;
+ * It has a key and a budget. Cannot be cloned
+ *
+ * @author Pei Wang
+ * @author Patrick Hammer
+ */
+public abstract class Item&lt;K&gt; implements Serializable {
+
+<span class="nc" id="L40">    public static class ItemPriorityComparator&lt;E extends Item&gt; implements Comparator&lt;E&gt; {</span>
+
+        @Override public int compare(final E a, final E b) {
+<span class="nc" id="L43">            final float ap = a.getPriority();</span>
+<span class="nc" id="L44">            final float bp = b.getPriority();</span>
+
+<span class="nc bnc" id="L46" title="All 6 branches missed.">            if ((a == b) || (a.name().equals(b.name())) || (ap==bp))</span>
+<span class="nc" id="L47">                return a.hashCode() - b.hashCode();</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">            else if (ap &lt; bp) return 1;</span>
+<span class="nc" id="L49">            else return -1;</span>
+        }        
+        
+    }
+    
+    /** The budget of the Item, consisting of 3 numbers */
+    public final BudgetValue budget;
+
+<span class="nc" id="L57">    public Item() { // items that do not need budget</span>
+<span class="nc" id="L58">        this.budget = null;</span>
+<span class="nc" id="L59">    }</span>
+          
+    /**
+     * Constructor with initial budget
+     * @param budget The initial budget
+     */
+<span class="fc" id="L65">    protected Item(final BudgetValue budget) {</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (budget!=null)</span>
+<span class="fc" id="L67">            this.budget = budget.clone(); // clone, not assignment</span>
+        else
+<span class="fc" id="L69">            this.budget = null;</span>
+<span class="fc" id="L70">    }</span>
+
+
+    /**
+     * Get the current key
+     * @return Current key value
+     */
+    abstract public K name();
+
+
+    /**
+     * Get priority value
+     * @return Current priority value
+     */
+     public float getPriority() {
+<span class="fc" id="L85">        return budget.getPriority();</span>
+    }
+
+    /**
+     * Set priority value
+     * @param v Set a new priority value
+     */
+    public void setPriority(final float v) {
+<span class="fc" id="L93">        budget.setPriority(v);</span>
+<span class="fc" id="L94">    }</span>
+
+    /**
+     * Increase priority value
+     * @param v The amount of increase
+     */
+    public void incPriority(final float v) {
+<span class="fc" id="L101">        budget.incPriority(v);</span>
+<span class="fc" id="L102">    }</span>
+
+    /**
+     * Decrease priority value
+     * @param v The amount of decrease
+     */
+    public void decPriority(final float v) {
+<span class="fc" id="L109">        budget.decPriority(v);</span>
+<span class="fc" id="L110">    }</span>
+
+    /**
+     * Get durability value
+     * @return Current durability value
+     */
+    public float getDurability() {
+<span class="fc" id="L117">        return budget.getDurability();</span>
+    }
+
+    /**
+     * Set durability value
+     * @param v The new durability value
+     */
+    public void setDurability(final float v) {
+<span class="nc" id="L125">        budget.setDurability(v);</span>
+<span class="nc" id="L126">    }</span>
+
+    /**
+     * Increase durability value
+     * @param v The amount of increase
+     */
+    public void incDurability(final float v) {
+<span class="fc" id="L133">        budget.incDurability(v);</span>
+<span class="fc" id="L134">    }</span>
+
+    /**
+     * Decrease durability value
+     * @param v The amount of decrease
+     */
+    public void decDurability(final float v) {
+<span class="fc" id="L141">        budget.decDurability(v);</span>
+<span class="fc" id="L142">    }</span>
+    
+    /**
+     * Get quality value
+     * @return The quality value
+     */
+    public float getQuality() {
+<span class="nc" id="L149">        return budget.getQuality();</span>
+    }
+
+    /**
+     * Set quality value
+     * @param v The new quality value
+     */
+    public void setQuality(final float v) {
+<span class="fc" id="L157">        budget.setQuality(v);</span>
+<span class="fc" id="L158">    }</span>
+
+    /**
+     * Merge with another Item with identical key
+     * @param that The Item to be merged
+     * @return the resulting Item: this or that
+     */
+    public Item merge(final Item that) {
+<span class="fc" id="L166">        budget.merge(that.budget);</span>
+<span class="fc" id="L167">        return this;</span>
+    }
+
+    /**
+     * Return a String representation of the Item
+     * @return The String representation of the full content
+     */
+    @Override
+    public String toString() {        
+        //return budget + &quot; &quot; + key ;
+        
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        final String budgetStr = budget!=null ? budget.toString() : &quot;&quot;;</span>
+<span class="fc" id="L179">        final String n = name().toString();</span>
+<span class="fc" id="L180">        return new StringBuilder(budgetStr.length()+n.length()+1).append(budgetStr).append(' ').append(n).toString();</span>
+    }
+
+    /**
+     * Return a String representation of the Item after simplification
+     * @return A simplified String representation of the content
+     */
+    public String toStringExternal() {                
+<span class="nc" id="L188">        final String briefBudget = budget.toStringExternal();</span>
+<span class="nc" id="L189">        final String n = name().toString();</span>
+<span class="nc" id="L190">        return new StringBuilder(briefBudget.length()+n.length()+1).append(briefBudget).append(' ').append(n).toString();</span>
+    }
+    
+    /** similar to toStringExternal but includes budget afterward */
+    public String toStringExternal2() {
+<span class="nc" id="L195">        final String briefBudget = budget.toStringExternal();</span>
+<span class="nc" id="L196">        final String n = name().toString();</span>
+<span class="nc" id="L197">        return new StringBuilder(briefBudget.length()+n.length()+1).append(n).append(' ').append(briefBudget).toString();</span>
+    }
+    
+    public String toStringLong() {
+<span class="nc" id="L201">    	return toString();</span>
+    }
+
+    /*//default:
+    @Override
+    public int compareTo(final Object o) {
+        //return System.identityHashCode(this) - System.identityHashCode(o);
+        return hashCode() - o.hashCode();
+    }*/
+    
+   @Override
+    public int hashCode() {
+<span class="nc" id="L213">        return name().hashCode();</span>
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+<span class="nc bnc" id="L218" title="All 2 branches missed.">        if (obj == this) return true;</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if (obj instanceof Item) {</span>
+<span class="nc" id="L220">            return ((Item)obj).name().equals(name());</span>
+        }
+<span class="nc" id="L222">        return false;</span>
+    }
+    
+    abstract public static class StringKeyItem extends Item&lt;CharSequence&gt; {
+        
+<span class="nc" id="L227">        public StringKeyItem(final BudgetValue budget) { super(budget);         }</span>
+
+                
+        @Override
+        public int hashCode() {
+<span class="nc" id="L232">            return name().hashCode();</span>
+        }
+
+        @Override
+        public boolean equals(final Object obj) {
+<span class="nc bnc" id="L237" title="All 2 branches missed.">            if (obj == this) return true;</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">            if (obj instanceof Item) {</span>
+<span class="nc" id="L239">                return ((Item)obj).name().equals(name());</span>
+            }
+<span class="nc" id="L241">            return false;</span>
+        }
+    
+    }
+
+    public static float getPrioritySum(final Iterable&lt;? extends Item&gt; c) {
+<span class="nc" id="L247">        float totalPriority = 0;</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        for (final Item i : c)</span>
+<span class="nc" id="L249">            totalPriority+=i.getPriority();</span>
+<span class="nc" id="L250">        return totalPriority;</span>
+    }
+
+    public BudgetValue getBudget() {
+<span class="fc" id="L254">        return budget;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>
