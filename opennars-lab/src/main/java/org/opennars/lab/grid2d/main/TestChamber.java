@@ -28,6 +28,7 @@ import org.opennars.lab.grid2d.map.Maze;
 import org.opennars.lab.grid2d.object.Key;
 import org.opennars.lab.grid2d.operator.Activate;
 import org.opennars.lab.grid2d.operator.Deactivate;
+import org.opennars.lab.grid2d.operator.Cut;
 import org.opennars.lab.grid2d.operator.Goto;
 import org.opennars.lab.grid2d.operator.Pick;
 import org.opennars.gui.NARSwing;
@@ -312,21 +313,6 @@ public class TestChamber {
                                                         if(ComplexFeedback)
                                                             nar.addInput("(--,<"+goal+" --> [on]>). :|: %1.00;0.90%");
                                                     }
-                                                    if(inventorybag!=null) {
-
-                                                        System.out.println(inventorybag.doorname);
-                                                        if(cells.readCells[i][j].logic==Logic.WIRE && inventorybag.doorname.contains("wirecut") )
-                                                        {
-                                                            cells.readCells[i][j].logic = Logic.OFFSWITCH;
-                                                            cells.writeCells[i][j].logic = Logic.OFFSWITCH;
-                                                            cells.readCells[i][j].charge = 0.0f;
-                                                            cells.writeCells[i][j].charge = 0.0f;
-
-                                                            if (ComplexFeedback)
-                                                                nar.addInput("(--,<" + goal + " --> [on]>). :|: %1.00;0.90%");
-                                                        }
-                                                    }
-                                                    else{System.out.println("Isnull");}
                                                 }
                                             }
                                         }
@@ -349,6 +335,28 @@ public class TestChamber {
                                             }
                                         }
                                     }
+                                    /////////////////////////////////////////////////////////
+                                    /////////////////////////////////////////////////////////
+                                    else if("cut".equals(opname)) {
+                                        for(int i=0;i<cells.h;i++) {
+                                            for (int j = 0; j < cells.w; j++) {
+                                                if (cells.readCells[i][j].name.equals(goal)) {
+                                                    if (inventorybag != null) {
+                                                        if (cells.readCells[i][j].logic == Logic.WIRE && inventorybag.doorname.contains("wirecut")) {
+                                                            cells.readCells[i][j].logic = Logic.OFFSWITCH;
+                                                            cells.writeCells[i][j].logic = Logic.OFFSWITCH;
+                                                            cells.readCells[i][j].charge = 0.0f;
+                                                            cells.writeCells[i][j].charge = 0.0f;
+
+                                                            if (ComplexFeedback)
+                                                                nar.addInput("(--,<" + goal + " --> [on]>). :|: %1.00;0.90%");
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    //////////////////////////////////////////////////////////
                                     if("go-to".equals(opname)) {
                                         executed_going=false;
                                         if(!goal.equals(lastgone)) {
@@ -439,6 +447,8 @@ public class TestChamber {
         nar.memory.addOperator(waa);
         Deactivate waaa = new Deactivate(this, "^deactivate");
         nar.memory.addOperator(waaa);
+        Cut waaaa = new Cut(this, "^cut");
+        nar.memory.addOperator(waaaa);
         space.add(a);
 
     }

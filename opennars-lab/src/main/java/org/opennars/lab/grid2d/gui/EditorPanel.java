@@ -634,6 +634,15 @@ public class EditorPanel extends JPanel {
             }
         });
 
+        actionMenu.add(new EditorMode("cut wire") {
+            @Override
+            public void run() {
+                s.cells.click("", "cut", "");
+                TestChamber.active=true;
+            }
+        });
+
+
         actionMenu.add(new EditorMode("perceive/name") {
             @Override
             public void run() {
