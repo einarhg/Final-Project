@@ -1,1 +1,5 @@
+.idea
+opennars/target
+opennars-applications/target
+opennars-gui/target
 opennars-lab/target
