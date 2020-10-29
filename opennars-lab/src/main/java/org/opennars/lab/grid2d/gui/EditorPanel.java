@@ -48,6 +48,7 @@ import org.opennars.lab.grid2d.main.TestChamber;
 import org.opennars.lab.grid2d.object.Key;
 import org.opennars.lab.grid2d.object.Pizza;
 import org.opennars.lab.grid2d.object.Wirecutters;
+import org.opennars.lab.grid2d.object.Shovel;
 import org.opennars.io.Symbols;
 import processing.core.PVector;
 
@@ -247,6 +248,14 @@ public class EditorPanel extends JPanel {
                 Wirecutters addu=new Wirecutters(x,y,name);
                 if(TestChamber.staticInformation)
                     s.nar.addInput("<"+name+" --> wirecutters>.");
+                addu.space=s;
+                newobj.add(addu);
+            }
+
+            if(val[0].equals("Shovel")) {
+                Shovel addu=new Shovel(x,y,name);
+                if(TestChamber.staticInformation)
+                    s.nar.addInput("<"+name+" --> shovel>.");
                 addu.space=s;
                 newobj.add(addu);
             }
@@ -599,6 +608,13 @@ public class EditorPanel extends JPanel {
                 s.cells.click("Wirecutters", "", "");
             }
         });
+
+        machineMenu.add(new EditorMode("Shovel") {
+            @Override
+            public void run() {
+                s.cells.click("Shovel", "", "");
+            }
+        });
         //////////////////////////////////////////////////////////////
 
         actionMenu.add(new EditorMode("Go-To named") {
@@ -638,6 +654,14 @@ public class EditorPanel extends JPanel {
             @Override
             public void run() {
                 s.cells.click("", "cut", "");
+                TestChamber.active=true;
+            }
+        });
+
+        actionMenu.add(new EditorMode("fill water") {
+            @Override
+            public void run() {
+                s.cells.click("", "fill", "");
                 TestChamber.active=true;
             }
         });

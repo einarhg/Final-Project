@@ -45,7 +45,8 @@ public class Cell {
         Pizza,
         ////////////////////////////////////////
         ////////////////////////////////////////
-        Wirecutters
+        Wirecutters,
+        Shovel
         ////////////////////////////////////////
         //case Tile.Upstairs:
         //case Tile.Downstairs:

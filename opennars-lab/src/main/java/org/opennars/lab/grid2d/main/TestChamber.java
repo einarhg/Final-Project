@@ -29,6 +29,7 @@ import org.opennars.lab.grid2d.object.Key;
 import org.opennars.lab.grid2d.operator.Activate;
 import org.opennars.lab.grid2d.operator.Deactivate;
 import org.opennars.lab.grid2d.operator.Cut;
+import org.opennars.lab.grid2d.operator.Fill;
 import org.opennars.lab.grid2d.operator.Goto;
 import org.opennars.lab.grid2d.operator.Pick;
 import org.opennars.gui.NARSwing;
@@ -357,6 +358,44 @@ public class TestChamber {
                                         }
                                     }
                                     //////////////////////////////////////////////////////////
+
+                                    /////////////////////////////////////////////////////////
+                                    /////////////////////////////////////////////////////////
+                                    else if("fill".equals(opname)) {
+                                        for(int i=0;i<cells.h;i++) {
+                                            for (int j = 0; j < cells.w; j++) {
+                                                if (cells.readCells[i][j].name.equals(goal)) {
+                                                    if (inventorybag != null && inventorybag.doorname.contains("shovel")) {
+                                                        if (i >= 1 && cells.readCells[i-1][j].material == Material.Water) {
+                                                            cells.readCells[i-1][j].material = Material.GrassFloor;
+                                                            cells.writeCells[i-1][j].material = Material.GrassFloor;
+                                                            cells.readCells[i-1][j].is_solid = false;
+                                                            cells.writeCells[i-1][j].is_solid = false;
+                                                        }
+                                                        if (i < cells.readCells[j].length-1 && cells.readCells[i+1][j].material == Material.Water ) {
+                                                            cells.readCells[i+1][j].material = Material.GrassFloor;
+                                                            cells.writeCells[i+1][j].material = Material.GrassFloor;
+                                                            cells.readCells[i+1][j].is_solid = false;
+                                                            cells.writeCells[i+1][j].is_solid = false;
+                                                        }
+                                                        if (j >= 1 && cells.readCells[i][j-1].material == Material.Water ) {
+                                                            cells.readCells[i][j-1].material = Material.GrassFloor;
+                                                            cells.writeCells[i][j-1].material = Material.GrassFloor;
+                                                            cells.readCells[i][j-1].is_solid = false;
+                                                            cells.writeCells[i][j-1].is_solid = false;
+                                                        }
+                                                        if (j < cells.readCells[i].length-1 && cells.readCells[i][j+1].material == Material.Water ) {
+                                                            cells.readCells[i][j+1].material = Material.GrassFloor;
+                                                            cells.writeCells[i][j+1].material = Material.GrassFloor;
+                                                            cells.readCells[i][j+1].is_solid = false;
+                                                            cells.writeCells[i][j+1].is_solid = false;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    //////////////////////////////////////////////////////////
                                     if("go-to".equals(opname)) {
                                         executed_going=false;
                                         if(!goal.equals(lastgone)) {
@@ -449,6 +488,8 @@ public class TestChamber {
         nar.memory.addOperator(waaa);
         Cut waaaa = new Cut(this, "^cut");
         nar.memory.addOperator(waaaa);
+        Fill waaaaa = new Fill(this, "^fill");
+        nar.memory.addOperator(waaaaa);
         space.add(a);
 
     }

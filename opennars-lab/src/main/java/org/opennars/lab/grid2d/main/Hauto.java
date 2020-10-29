@@ -32,6 +32,7 @@ import org.opennars.lab.grid2d.main.Cell.Material;
 import org.opennars.lab.grid2d.object.Key;
 import org.opennars.lab.grid2d.object.Pizza;
 import org.opennars.lab.grid2d.object.Wirecutters;
+import org.opennars.lab.grid2d.object.Shovel;
 
 public class Hauto {
     private final Nar nar;
@@ -159,13 +160,8 @@ public class Hauto {
             if(down.chargeFront && down.logic==WIRE)
                 w.value2=down.charge;
         }
-        
-        ///////////////////////////////////////////////////////////////////////////////////////////////
-        ////////////////////////////////////// WIRECUTTERS ////////////////////////////////////////////
-        
-        
-        
-        
+
+
         
         if(!r.chargeFront && r.charge==0 && (((bridge(right.logic) && right.value==1) || (bridge(left.logic) && left.value==1)) || ((bridge(down.logic) && down.value2==1))))
         {
@@ -331,6 +327,25 @@ public class Hauto {
         }
         if(!(selected.material==Material.Door) && !(selected.material==Material.Wirecutters))
             doorname="";
+
+
+
+        if(selected.material==Material.Shovel) {
+            doorname="{shovel"+entityID.toString()+"}";
+        }
+        if(!"".equals(doorname) && selected.material==Material.Shovel) {
+            space.add(new Shovel(x, y, doorname));
+            if(TestChamber.staticInformation)
+                nar.addInput("<"+doorname+" --> shovel>.");
+            if(TestChamber.curiousity) {
+                space.nar.addInput("<(^go-to,{SELF}," + doorname + ") =/> <{SELF} --> [curious]>>.");
+            }
+            entityID++;
+            doorname="";
+            return;
+        }
+        if(!(selected.material==Material.Door) && !(selected.material==Material.Shovel))
+            doorname="";
         /////////////////////////////////////////////////////////////
 
 
@@ -347,7 +362,7 @@ public class Hauto {
         writeCells[x][y].machine = selected.machine;
 
         /////////////////////////////////////////////////////
-        if(selected.material==Material.Wirecutters || selected.material==Material.Pizza || selected.material==Material.Door || selected.logic==Logic.OFFSWITCH || selected.logic==Logic.SWITCH || selected.machine==Machine.Light || selected.machine==Machine.Turret) //or other entity...
+        if(selected.material==Material.Shovel ||selected.material==Material.Wirecutters || selected.material==Material.Pizza || selected.material==Material.Door || selected.logic==Logic.OFFSWITCH || selected.logic==Logic.SWITCH || selected.machine==Machine.Light || selected.machine==Machine.Turret) //or other entity...
         {
             String name="";
             if(selected.material==Material.Door) {
@@ -527,6 +542,12 @@ public class Hauto {
         if("Wirecutters".equals(label)) {
             selected.logic = Logic.NotALogicBlock;
             selected.material = Material.Wirecutters;
+            selected.is_solid=false;
+        }
+
+        if("Shovel".equals(label)) {
+            selected.logic = Logic.NotALogicBlock;
+            selected.material = Material.Shovel;
             selected.is_solid=false;
         }
         /////////////////////////////////////////////////////////////////////
