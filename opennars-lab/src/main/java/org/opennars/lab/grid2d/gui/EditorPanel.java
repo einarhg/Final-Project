@@ -817,7 +817,7 @@ public class EditorPanel extends JPanel {
                 for (GridObject g : s.objects) {
                     if (g instanceof LocalGridObject) {
                         LocalGridObject obi = (LocalGridObject) g;
-                        if (obi instanceof Key) {
+                        if (obi instanceof Key || obi instanceof Shovel || obi instanceof Wirecutters) {
                             s.nar.addInput("<(&/,<" + obi.doorname + " --> [at]>,(^pick,{SELF}," + obi.doorname + ")) =/> <" + obi.doorname + " --> [hold]>>.");
                         }
                     }
@@ -828,6 +828,27 @@ public class EditorPanel extends JPanel {
                  s.nar.addInput("<(&/,<key3 --> at>,(^pick,{SELF},key3)) =/> <key3 --> hold>>.");*/
             }
         });  //s.nar.addInput("<(&/,<$1 --> at>,(^pick,{SELF},$1)) =/> <$1 --> hold>>.");
+
+
+
+        /////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////
+        knowMenu.add(new EditorMode("This switch turns this light off") {
+            @Override
+            public void run() {
+                s.nar.addInput("<(^deactivate,{SELF},{switch0}) =/> <{light1} --> [off]>>.");
+            }
+        });
+
+        knowMenu.add(new EditorMode("This switch turns this light on") {
+            @Override
+            public void run() {
+                s.nar.addInput("<(^activate,{SELF},{switch0}) =/> <{light1} --> [on]>>.");
+            }
+        });
+        /////////////////////////////////////////////////////
+
+
 
         resourceMenu.add(new EditorMode("need pizza") {
             @Override
