@@ -36,6 +36,7 @@ import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import org.opennars.entity.Concept;
 import org.opennars.entity.TaskLink;
+import org.opennars.lab.grid2d.main.Cell;
 import org.opennars.lab.grid2d.main.Cell.Logic;
 import org.opennars.lab.grid2d.main.Cell.Machine;
 import org.opennars.lab.grid2d.main.Cell.Material;
@@ -800,6 +801,86 @@ public class EditorPanel extends JPanel {
                 s.nar.addInput("(--,<(&/,<$1 --> [at]>,(^deactivate,{SELF},$1)) =/> <$1 --> [on]>>). %1.00;0.90%");
                 //s.nar.addInput("(&&,<#1 --> on>,<<#1 --> on> =/> <#2 --> on>>).");
                 //s.nar.addInput("(&&,<#1 --> on>,<<#1 --> on> =/> <#2 --> opened>>).");
+            }
+        });
+
+        knowMenu.add(new EditorMode("If you hold wirecutters ") {
+            @java.lang.Override
+            public void run() {
+                s.nar.addInput("<{switch0} --> [at]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^activate,{SELF},{switch0}). :|: %1.00;0.90%");
+                s.nar.addInput("<{switch0} --> [on]>. :|: %1.00;0.90%");
+                s.nar.addInput("<{light1} --> [on]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^deactivate,{SELF},{switch0}). :|: %1.00;0.90%");
+                s.nar.addInput("(--,<{switch0} --> [on]>). :|: %1.00;0.90%");
+                s.nar.addInput("(--,<{light1} --> [on]>). :|: %1.00;0.90%");
+                s.nar.cycles(500);
+            }
+        });
+
+        knowMenu.add(new EditorMode("Turn light on/off") {
+            @java.lang.Override
+            public void run() {
+                s.nar.addInput("<{switch0} --> [at]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^activate,{SELF},{switch0}). :|: %1.00;0.90%");
+                s.nar.addInput("<{switch0} --> [on]>. :|: %1.00;0.90%");
+                s.nar.addInput("<{light1} --> [on]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^deactivate,{SELF},{switch0}). :|: %1.00;0.90%");
+                s.nar.addInput("(--,<{switch0} --> [on]>). :|: %1.00;0.90%");
+                s.nar.addInput("(--,<{light1} --> [on]>). :|: %1.00;0.90%");
+                s.nar.cycles(500);
+            }
+        });
+
+        knowMenu.add(new EditorMode("Open doors") {
+            @java.lang.Override
+            public void run() {
+                s.nar.addInput("(^go-to,{SELF},{place0}). :|: %1.00;0.90%");
+                s.nar.addInput("<{place0} --> [at]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^go-to,{SELF},{key2}). :|: %1.00;0.90%");
+                s.nar.addInput("<{key2} --> [at]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^pick,{SELF},{key2}). :|: %1.00;0.90%");
+                s.nar.addInput("<{key2} --> hold>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^go-to,{SELF},{place0}). :|: %1.00;0.90%");
+                s.nar.addInput("<{place0} --> [at]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^go-to,{SELF},{key1}). :|: %1.00;0.90%");
+                s.nar.addInput("<{key1} --> [at]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^go-to,{SELF},{place0}). :|: %1.00;0.90%");
+                s.nar.addInput("<{place0} --> [at]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^go-to,{SELF},{key1}). :|: %1.00;0.90%");
+                s.nar.addInput("<{key1} --> [at]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^pick,{SELF},{key1}). :|: %1.00;0.90%");
+                s.nar.addInput("<{key1} --> hold>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^go-to,{SELF},{place0}). :|: %1.00;0.90%");
+                s.nar.addInput("<{place0} --> [at]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^go-to,{SELF},{place3}). :|: %1.00;0.90%");
+                s.nar.addInput("<{place3} --> [at]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^pick,{SELF},{key2}). :|: %1.00;0.90%");
+                s.nar.addInput("<{key2} --> hold>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^go-to,{SELF},{key2}). :|: %1.00;0.90%");
+                s.nar.addInput("<{key2} --> [at]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^pick,{SELF},{key2}). :|: %1.00;0.90%");
+                s.nar.addInput("<{key2} --> hold>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
+                s.nar.addInput("(^go-to,{SELF},{place0}). :|: %1.00;0.90%");
+                s.nar.addInput("<{place0} --> [at]>. :|: %1.00;0.90%");
+                s.nar.cycles(500);
             }
         });
         
